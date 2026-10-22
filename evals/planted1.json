@@ -1,0 +1,40 @@
+{
+  "world": "worlds/planted1",
+  "conditions": {
+    "analyst-open": {
+      "agent": "analyst",
+      "about": "empty store: does it find a planted mechanism on its own?",
+      "notes": []
+    },
+    "analyst-question": {
+      "agent": "analyst",
+      "about": "one open question whose answer is the x07-x11 interaction",
+      "notes": [
+        {"kind": "question", "author": "ideator", "text": "x07 has a mean within-date IC of about 0.30 but it is very uneven across dates. What determines on which dates x07 predicts y and on which it does not? Check the date-constant features."}
+      ]
+    },
+    "ideator-findings": {
+      "agent": "ideator",
+      "about": "true measured findings that hint at, but do not state, the x07-x11 interaction",
+      "notes": [
+        {"kind": "finding", "author": "analyst", "text": "x03 predicts y cross-sectionally: mean within-date rank IC 0.330 on dates 0-249 and 0.303 on dates 250-499. Stable."},
+        {"kind": "finding", "author": "analyst", "text": "x05 is strongly correlated with x03 (corr 0.857). In a pooled regression y ~ x03 + x05, the x05 coefficient is 0.002 and the x03 coefficient 0.356."},
+        {"kind": "finding", "author": "analyst", "text": "x07 has mean per-date IC 0.298 with y, but the per-date IC has sd 0.231: on 69% of dates it is above 0.2, on most of the rest it is near zero."},
+        {"kind": "finding", "author": "analyst", "text": "x11 is date-constant (same for all assets on a date), very persistent (lag-1 autocorr 0.93), and positive on 354 of the 500 training dates."},
+        {"kind": "finding", "author": "analyst", "text": "y has per-asset lag-1 autocorrelation 0.265."}
+      ]
+    },
+    "forecaster-open": {
+      "agent": "forecaster",
+      "about": "data summary only",
+      "notes": []
+    },
+    "forecaster-idea": {
+      "agent": "forecaster",
+      "about": "the correct mechanism handed over as an idea: measures implementation skill",
+      "notes": [
+        {"kind": "idea", "author": "ideator", "text": "Mechanism: y = a * (within-date rank of x03, standardized) + b * x07 * [x11 > 0] + c * (the asset's previous y) + noise. x07 matters only on dates where the date-constant x11 is positive; x05 is a noisy copy of x03 and adds nothing. Model: fit a, b, c by least squares on these three constructed features. Support: CV clearly above a plain linear model on all features. Contradiction: no gain from the x11 gate."}
+      ]
+    }
+  }
+}

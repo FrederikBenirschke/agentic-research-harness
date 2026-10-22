@@ -1,0 +1,16 @@
+{
+ "world": "worlds/planted3",
+ "conditions": {
+  "forecaster-truenote": {
+   "agent": "forecaster",
+   "about": "positive control: one correct finding naming all three mechanisms and the decoy",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "y has three sources. (1) A U-shape in x04: y rises with x04 squared (coef ~0.30 on x04^2-1); corr(x04,y) is ~0, so a linear screen misses it. x12 is x04^2 plus noise: it correlates with y (+0.32) only through x04 and drops out once x04^2 is in the model. (2) x10 acts with a two-period delay: y depends on x10 at t-2 (coef ~0.25), today's x10 is weak (corr 0.07 vs 0.22 at lag 2). (3) Cross-asset lead-lag: assets 20..39 follow asset (a-20)'s previous-period y (coef ~0.30); assets 0..19 do not."
+    }
+   ]
+  }
+ }
+}

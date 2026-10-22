@@ -1,0 +1,7 @@
+{
+  "world": "worlds/planted3",
+  "conditions": {
+    "analyst-open": {"agent": "analyst", "about": "mechanisms no prompt mentions: U-shape, lag 2, cross-asset lead-lag", "notes": []},
+    "forecaster-open": {"agent": "forecaster", "notes": []}
+  }
+}

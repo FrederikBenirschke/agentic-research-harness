@@ -1,0 +1,13 @@
+{
+  "world": "worlds/planted1b",
+  "conditions": {
+    "analyst-open": {
+      "agent": "analyst",
+      "notes": []
+    },
+    "forecaster-open": {
+      "agent": "forecaster",
+      "notes": []
+    }
+  }
+}

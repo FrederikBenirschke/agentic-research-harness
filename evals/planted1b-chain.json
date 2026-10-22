@@ -1,0 +1,27 @@
+{
+ "world": "worlds/planted1b",
+ "conditions": {
+  "forecaster-opusfinding": {
+   "agent": "forecaster",
+   "about": "one correct Opus analyst finding (ana-af7fb0) naming the x07-x11 gate",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "x07 predicts y only when the date-level feature x11 is above ~0: when x11 is high, x07's slope is ~0.45 per std; when x11 is low it is 0. Also, x05 is a proxy for x03 (corr 0.86) and drops out once x03 is in the model.\n\nNumbers (pooled OLS of y on x03, x05, x07, ylag, where ylag = previous-period y for the same asset; n=19960):\n- Whole sample: x03 0.327 (t=23), x05 0.003 (t=0.2), x07 0.212 (t=29), ylag 0.19 (t=29). R2 0.18.\n- x11 above its median (n=10000): x07 slope 0.442 (t=42), corr(x07,y) +0.405. R2 0.28.\n- x11 at or below its median (n=9960): x07 slope -0.007 (t=-0.7), corr(x07,y) -0.005. R2 0.15.\n- Stable over time once you split by regime (OLS on x03, x07, ylag). x07 slope by half and regime: H1-hi 0.436 (t=25, n=3400), H1-lo -0.005, H2-hi 0.446 (t=35, n=6600), H2-lo -0.013. The jump in x07's unconditional slope from H1 to H2 (0.14 to 0.28) comes entirely from regime mix: H2 has twice as many high-x11 dates.\n- It looks like a step, not a linear interaction. x07 slope by x11 quintile: [-2.75,-0.9] 0.02, [-0.9,-0.31] -0.03, [-0.31,0.25] 0.16 (this bin straddles the step), [0.25,0.73] 0.46, [0.73,2.68] 0.45. Requiring x11>0 gives slope 0.454; thresholds of 0.25 or 0.5 give the same ~0.46. The step is near x11\u22480.\n- Other effects are much less regime-dependent. x03 slope is 0.40 in the low regime and 0.28 in the high regime, positive in both. ylag is ~0.16-0.17 in both regimes.\n- x05 vs x03: corr 0.86. Fitted together, x03 keeps its full effect and x05's coefficient is \u22480 (|t|<2 in each half). x05's raw IC of 0.28 is just a proxy for x03.\n\nMethod: pooled OLS with intercept. The regime split uses the median of the date-constant x11 across dates; time halves split on the median date. ylag is y shifted by 1 within each asset, i.e. the return realised by date t. Script: a.py.\n\nWhat this does NOT show: the exact threshold (anything in about -0.1 to 0.25 looks similar) or the shape of the transition inside that band. It does not show whether x11 gates any other feature (I only checked x03, x05 and x07). There is no out-of-sample test of a gated model. The t-stats are from pooled OLS and ignore within-date correlation, but the effects are large enough that this doesn't matter. Suggested model term: x07 * 1[x11>0], plus x03 and ylag; drop x05."
+    }
+   ]
+  },
+  "forecaster-haikufinding": {
+   "agent": "forecaster",
+   "about": "one Haiku v1 analyst finding (ana-4b3d8e) that missed the gate",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "Lagged target y_{t-1} (the same asset's previous-period return, known at date t) is a strong, stable predictor of y: within-date rank IC +0.242 (se 0.007, 498 dates); +0.222 in first half, +0.262 in second half. Lag 2 gives a weaker +0.093 (se 0.007), so the effect is mostly at lag 1. Pooled corr is +0.266. After regressing y on the three strongest features (x03, x05, x07) by pooled OLS, the residual still correlates with y_{t-1} at +0.18 (first half) and +0.21 (second half). Measured on 20000 rows, 40 assets, 500 dates; the lagged y is computed per asset with shift(1) and shift(2), dropping the first 2 rows per asset. Not shown: whether this is genuine momentum/reversal versus a mechanical artifact of overlapping return windows (we did not check the construction of y), whether it survives out of sample in a fitted model (no model was trained), or whether it is additive to x03/x05/x07 within-date (the residual test is pooled, not within-date, and the features themselves correlate ~0.12-0.19 with y_{t-1}). Also note the rank IC is computed per date across 40 assets, so cross-sectional and time-series effects are mixed here."
+    }
+   ]
+  }
+ }
+}

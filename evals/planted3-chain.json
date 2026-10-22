@@ -1,0 +1,16 @@
+{
+ "world": "worlds/planted3",
+ "conditions": {
+  "forecaster-movefinding": {
+   "agent": "forecaster",
+   "about": "one Haiku move-arm analyst finding (ana-8d879b) diagnosing x12 as a copy of x04^2",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "x12's predictive power comes from x04 squared: x12 \u2248 x04\u00b2 (corr 0.89, fitted coefficient on x04\u00b2 = 1.00), and x04\u00b2 has a stronger, stable, convex relation with y than x12 itself (pooled corr with y +0.36 vs +0.32; within-date rank IC +0.268, t=39 vs +0.232 for x12). Once x04\u00b2 is in the picture, x12's residual (x12 \u2212 x04\u00b2) has corr 0.002 with y, so x12 is a noisy copy of x04\u00b2.\nNumbers: n=19,800 (lag-trimmed panel, 40 assets \u00d7 500 dates). Pooled corr(y, x04\u00b2) = +0.364; first half +0.358, second half +0.370. Rank IC of x04\u00b2 by date: mean +0.268 (t=39.5), first 250 dates +0.258, last 250 +0.278. Regime split by the date-level cross-sectional mean of x04\u00b2 (median split): above median corr +0.394 (n=10,000), below +0.319 (n=10,000). Mean y by x04\u00b2 decile rises monotonically from about \u22120.32 (bottom) to +0.97 (top decile), with a convex top end. The same shape as x12's decile profile.\nSource check: regressing x12 on the other 15 features plus their squares gives R\u00b2 = 0.79; linear-only R\u00b2 = 0.001. The squared-term coefficient on x04 is 1.00 and every other squared coefficient is below 0.01. Joint regression of y on x12 and its explained part (x12-hat): the x12 coefficient collapses to t=0.12 while x12-hat keeps t=24.8. So x12's signal runs entirely through the x04\u00b2 component.\nLags: corr(y, x12 lagged 1) = +0.11, lag 2 = +0.04, lag 3 = +0.01, lag 5 = \u22120.00. The signal is not persistent at lag \u22652 in x12 itself; I did not run the lagged test on x04\u00b2 separately.\nDoes NOT show: that x04\u00b2 is the true data-generating term (I found it by reading x12's source, so the choice of x04 is post-hoc, though it is a single-feature, single-explanation test and holds in both halves); that the effect survives transaction costs or out-of-sample modelling; the magnitude of the rank IC in live trading. The IC is cross-sectional, so it is a ranking signal, and the top decile carries most of the mean.\nArtifact: test_x04sq.py (regenerates all numbers above from ../data/train.parquet; uses polars and numpy only). The earlier x12 shape/lag/explainability checks are in analyze_x12.py and source_x12.py in the same work directory."
+    }
+   ]
+  }
+ }
+}

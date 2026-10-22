@@ -1,0 +1,9 @@
+{
+  "world": "worlds/rank100v2",
+  "conditions": {
+    "forecaster-open": {
+      "agent": "forecaster",
+      "notes": []
+    }
+  }
+}
