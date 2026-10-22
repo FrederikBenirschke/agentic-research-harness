@@ -65,7 +65,7 @@ def status(root: Path) -> None:
 
 
 def _terminate(*_) -> None:
-    """Killing arh must kill its agent CLIs too, or they keep the local model busy."""
+    """On SIGTERM, also stop the agent CLI subprocesses; otherwise they keep running on the local model."""
     subprocess.run(["pkill", "-TERM", "-P", str(os.getpid())])
     os._exit(143)
 
@@ -89,7 +89,7 @@ def main() -> None:
     sub.choices["loop"].add_argument("--parallel", type=int, default=3)
     sub.choices["notes"].add_argument("--kind")
     sub.choices["notes"].add_argument("--query", default="")
-    s = sub.add_parser("metrics", help="process and honesty metrics for every agent run of a research run")
+    s = sub.add_parser("metrics", help="process and grounding metrics for every agent run of a research run")
     s.add_argument("name")
     s.add_argument("--judge", help="Ollama model to grade each note")
     s = sub.add_parser("eval", help="run one agent N times on a frozen eval condition and grade each run")

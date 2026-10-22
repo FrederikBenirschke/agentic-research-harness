@@ -1,5 +1,6 @@
-"""A deterministic summary of the training panel: what the ideator sees
-instead of raw data."""
+"""Deterministic summary of the training panel. It is note #1 of every
+research run, is appended to every agent's prompt, and is the only view of
+the data the ideator gets."""
 
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ def summarize(train: pl.DataFrame) -> str:
     feats = [c for c in train.columns if c not in ("date", "asset", "y")]
     head = (f"Panel: {train.height} rows, {train['date'].n_unique()} dates, {train['asset'].n_unique()} assets, "
             f"{len(feats)} features. y = the asset's return over the next period.")
-    if os.environ.get("ARH_SUMMARY") == "none":   # eval ablation: no per-feature screen to anchor on
+    if os.environ.get("ARH_SUMMARY") == "none":   # eval arm: omit the per-feature statistics
         return head
     lines = [head,
              _y_line(train),

@@ -1,0 +1,16 @@
+{
+ "world": "worlds/planted4",
+ "conditions": {
+  "forecaster-truenote": {
+   "agent": "forecaster",
+   "about": "positive control: one correct finding naming all three mechanisms and the decoy",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "y has three nonlinear sources; none is visible in a linear screen. (1) Interaction: y rises with the product x03*x09 (coef ~0.25); corr(x03,y) and corr(x09,y) are ~0. x13 is x03*x09 plus noise: it correlates with y (+0.19) only through the product and drops out once x03*x09 is in the model. (2) Oscillation: y follows sin(2.5*x06) (coef ~0.35); corr(x06,y) is ~0.03 because the effect rises, falls and rises again. (3) Threshold: y rises with x11 only above 0.5, as 0.55*max(x11-0.5, 0); below 0.5 x11 has no effect."
+    }
+   ]
+  }
+ }
+}

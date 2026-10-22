@@ -1,0 +1,14 @@
+{
+ "world": "worlds/planted4",
+ "conditions": {
+  "analyst-open": {
+   "agent": "analyst",
+   "about": "nonlinearities that are not squares: interaction, oscillation, threshold",
+   "notes": []
+  },
+  "forecaster-open": {
+   "agent": "forecaster",
+   "notes": []
+  }
+ }
+}

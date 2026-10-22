@@ -1,20 +1,20 @@
-"""Grade agent runs. Every agent run gets three groups of metrics:
+"""Grade agent runs. Each run gets three groups of metrics:
 
-process   did it finish, follow the protocol (one note), how it used its tools
-          (calls, errors, redundant repeats, read before write), effort (turns,
-          trials, tokens, wall time)
-honesty   are the refs it cites notes it actually saw; are the numbers in its
-          note present in what its tools returned; does a forecast report the
-          CV the harness measured; does an analyst's script rerun
-accuracy  with a world's sealed truth.json: which planted mechanisms its note
-          names, whether it names the decoy, and for a forecast holdout R2 as a
-          share of the oracle's
+process    whether it finished and wrote exactly one note; tool use (calls, errors,
+           repeated identical calls, whether it read notes before writing); effort
+           (turns, trials, tokens, wall time)
+grounding  whether the notes it cites were returned to it by a tool; whether the
+           numbers in its note appear in tool output; whether a forecast reports
+           the CV the harness measured; whether an analyst's script reruns
+accuracy   using the world's sealed truth.json: which planted mechanisms the note
+           names, whether it names the decoy, and for a forecast the holdout R2
+           divided by the oracle's
 
-plus an optional LLM judge (any Ollama model) scoring specificity, evidence,
+An optional LLM judge (a claude-* or Ollama model) scores specificity, evidence,
 actionability, clarity and, given the truth, correctness.
 
-An eval condition (evals/<world>.json) is an agent plus a frozen set of notes
-it starts from, so one agent is tested without running the others.
+An eval condition (evals/<world>.json) is one agent plus a fixed set of starting
+notes, so one agent can be tested without running the others.
 """
 
 from __future__ import annotations
@@ -96,7 +96,7 @@ def run_metrics(root: Path, run: str) -> dict:
     notes = [store.get(n["id"]) for n in store.search(k=10_000) if n["run"] == run]
     writes = [c for c in calls if c["name"] == "add_note"]
     first_write = calls.index(writes[0]) if writes else len(calls)
-    seen = " ".join([meta.get("task") or ""] + [c["result"] for c in calls[:first_write]])   # task: notes handed over
+    seen = " ".join([meta.get("task") or ""] + [c["result"] for c in calls[:first_write]])   # quick mode puts notes in the task
     keys = [json.dumps([c["name"], c["input"]], sort_keys=True) for c in calls]
     m = {"run": run, "agent": meta["agent"], "model": meta["model"],
          "finished": final is not None and not final.get("is_error") and not meta["error"],
@@ -130,7 +130,7 @@ def run_metrics(root: Path, run: str) -> dict:
     return m
 
 
-# What the agent's code actually checked, whatever its note claims. Keyword-level, like accuracy().
+# Checks detected by regex in the agent's code (Bash commands and .py files), regardless of what its note says.
 CHECKS = {
     "time_split": r"half|first_half|second_half|date\"?\)? *[<>]=? *\d{2,}|by_year|period|rolling",
     "regime_split": r"median\(\)|quantile|> *0\b.*date|regime",
@@ -182,9 +182,10 @@ def code_tokens(code: str) -> str:
 
 
 def accuracy(note: dict, truth: dict, code: str = "") -> dict:
-    """Deterministic: a mechanism is named when all its features are (y-mechanisms by lag words) and, if the
-    truth gives a ``pattern``, its form is named too (x04 alone is not the U-shape).
-    ``code``: a forecast's model source; only what the code uses counts, not its comments."""
+    """Regex grading against the truth. A mechanism counts as found if all its features are named (for y,
+    a lag word such as "lag" or "momentum") and, if the truth gives a ``pattern``, the pattern matches
+    (naming x04 alone does not count as the U-shape). ``code`` is a forecast's model source; only names and
+    strings used in the code count, not comments or docstrings."""
     code = code_tokens(code) if code else ""
     text = (note["text"] + " " + code).lower()
     feats = set(FEAT.findall(text))
@@ -225,7 +226,7 @@ def judge(note: dict, agent: str, model: str, truth: dict | None) -> dict:
         out = json.loads(_claude(prompt, model) if model.startswith("claude-") else _ollama(prompt, model))
         return {f"judge_{k}": out.get(k) for k in ("specificity", "evidence", "actionability", "clarity",
                                                      "correct", "why")}
-    except Exception as e:                       # a failed judge is a missing grade, not a crash
+    except Exception as e:                       # record a judge failure as a missing grade
         return {"judge_error": f"{type(e).__name__}: {e}"[:200]}
 
 
@@ -292,8 +293,9 @@ QUICK_TURNS = {"analyst": 2}     # fewest turns that can produce the note: analy
 async def run_conditions(spec_path: Path, conditions: list[str], model: str, n: int, judge_model: str | None,
                          parallel: int, runs_dir: Path, max_turns: int = 15, timeout_s: float = 600,
                          prompts: Path | None = None, out: Path | None = None) -> list[dict]:
-    """Every (condition, rep) shares one pool: a local server serving several requests at once has
-    ~2.5x the throughput of one at a time (needs OLLAMA_NUM_PARALLEL >= parallel)."""
+    """Run n reps of each condition, at most ``parallel`` at a time, and append each graded run to ``out``.
+    All (condition, rep) pairs share one pool because a local Ollama server has about 2.5x the throughput
+    when serving several requests at once (requires OLLAMA_NUM_PARALLEL >= parallel)."""
     from arh.cli import init
     spec = json.loads(spec_path.read_text())
     world = (spec_path.parent.parent / spec["world"]).resolve()
@@ -314,7 +316,7 @@ async def run_conditions(spec_path: Path, conditions: list[str], model: str, n: 
             for note in cond["notes"]:
                 store.add(note["kind"], note["author"], note["text"], note.get("refs", []))
             turns, task = max_turns or QUICK_TURNS.get(cond["agent"], 1), ""
-            if not max_turns:                   # quick: hand over every note, ask for the note at once
+            if not max_turns:                   # quick mode: put all notes in the task, ask for the note directly
                 notes = "\n\n".join(render(n, full=True) for n in reversed(store.search(k=30)))
                 task = (f"All notes so far:\n\n{notes}\n\nYou have {turns} turn(s), so do not search. "
                         + ("Run one script, then call add_note." if turns > 1 else "Call add_note now."))
@@ -375,7 +377,7 @@ def report(results: Path) -> str:
     return "\n".join(out)
 
 
-# The metric that matters most per agent, then the ones that explain it.
+# Scorecard columns per agent: the main metric first, then related ones.
 HEADLINE = {
     "analyst": ["protocol_ok", "x07_found", "n_mechanisms_hit", "numbers_grounded", "rerun_numbers", "judge_correct_rate"],
     "ideator": ["protocol_ok", "n_mechanisms_hit", "numbers_grounded", "judge_actionability", "judge_correct_rate"],

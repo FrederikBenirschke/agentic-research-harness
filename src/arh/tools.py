@@ -1,6 +1,7 @@
-"""The tools an agent gets: search and read notes, add a note of a kind its
-role may write, and (forecaster) score a model. Served in-process over MCP, so
-the store and the scorer run in the harness, outside the agent's sandbox."""
+"""Agent tools: search and read notes, add a note of a kind the agent may
+write, and (forecaster only) score a model. They are served in-process over
+MCP, so the store and the scorer run in the harness process, outside the
+agent's sandbox."""
 
 from __future__ import annotations
 
@@ -88,7 +89,7 @@ def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, w
         except (ValueError, score.ScoreError) as e:
             return _err(str(e))
         if kind == "forecast":
-            try:                                    # recorded, never returned
+            try:                                    # stored, not returned to the agent
                 store.set_holdout(note_id, await asyncio.to_thread(score.holdout, work / artifact, world))
             except score.ScoreError:
                 pass

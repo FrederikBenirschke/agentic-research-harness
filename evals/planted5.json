@@ -1,0 +1,7 @@
+{
+ "world": "worlds/planted5",
+ "conditions": {
+  "analyst-open": {"agent": "analyst", "about": "how the features relate to y", "notes": []},
+  "forecaster-open": {"agent": "forecaster", "notes": []}
+ }
+}

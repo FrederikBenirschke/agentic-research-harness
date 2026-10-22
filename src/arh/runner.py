@@ -78,7 +78,7 @@ async def run_agent(root: Path, agent: str, task: str = "", model: str | None = 
                                 world=world, can_score="score" in meta.get("tools", []), has_files=shell)
     store.start_run(run, agent, task, model)
     summary = store.search(kind="summary", k=1)
-    if summary:                                   # everyone starts from the data summary, not only those who search for it
+    if summary:                                   # append the data summary to every agent's prompt
         prompt += f"\n\n# Data summary (note #{summary[0]['id']})\n\n{summary[0]['text']}"
     opts = ClaudeAgentOptions(
         system_prompt=prompt,
@@ -90,10 +90,12 @@ async def run_agent(root: Path, agent: str, task: str = "", model: str | None = 
         model=model,
         max_turns=max_turns,
         max_budget_usd=max_budget_usd,
-        env={"PATH": f"{Path(sys.executable).parent}:/usr/bin:/bin", **model_env(model)},
+        # no background Bash: an agent that backgrounds a slow fit waits on it and ends without a note
+        env={"PATH": f"{Path(sys.executable).parent}:/usr/bin:/bin", "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1",
+             "BASH_DEFAULT_TIMEOUT_MS": "600000", "BASH_MAX_TIMEOUT_MS": "600000", **model_env(model)},
         sandbox=sandbox(work),
         extra_args={"strict-mcp-config": None},   # no claude.ai connectors or host MCP servers
-        **({} if model is None or model.startswith("claude-")   # local decode is ~14 tok/s: keep reasoning short
+        **({} if model is None or model.startswith("claude-")   # local models decode at ~14 tok/s, so limit reasoning
            else {"effort": "low", "max_thinking_tokens": 1024}),
     )
     (root / "traces").mkdir(exist_ok=True)
@@ -107,7 +109,7 @@ async def run_agent(root: Path, agent: str, task: str = "", model: str | None = 
                         final = msg
                     elif isinstance(msg, AssistantMessage):
                         trace.flush()
-        except Exception as e:                    # a capped or failed run is still a recorded run
+        except Exception as e:                    # record the run with its error (budget cap, timeout, crash)
             error = f"{type(e).__name__}: {e}"[:1000]
     store.end_run(run, getattr(final, "total_cost_usd", None), getattr(final, "num_turns", None),
                   error or (None if final is None or not final.is_error else final.subtype))

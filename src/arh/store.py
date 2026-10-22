@@ -1,9 +1,9 @@
-"""The one shared store: notes agents write and search, the agent runs that
-wrote them, and every model scoring (trial) so results can be read against
-how many were tried.
+"""SQLite store shared by all agents. Tables: notes, agent runs, and trials
+(one row per score_model call, so a result can be compared with the number of
+models tried).
 
-Agents reach the store only through tools (arh.tools); the holdout column is
-never part of anything a tool returns.
+Agents access the store only through the tools in arh.tools. No tool returns
+the holdout column.
 """
 
 from __future__ import annotations
@@ -143,7 +143,7 @@ class Store:
 
 
 def render(note: dict, full: bool = False) -> str:
-    """How a note reads to an agent. Never includes the holdout."""
+    """Format a note as shown to agents. The holdout score is not included."""
     head = f"#{note['id']} {note['kind']} by {note['author']}"
     if note.get("cv") is not None:
         head += f" (cv R2 {note['cv']:.4f})"
