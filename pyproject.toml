@@ -2,6 +2,9 @@
 name = "agentic-research-harness"
 version = "0.1.0"
 description = "Independent research agents (analyst, ideator, forecaster) over one shared note store."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Frederik Benirschke"}]
 requires-python = ">=3.11"
 dependencies = ["claude-agent-sdk>=0.2.168", "numpy", "polars", "scikit-learn", "scipy"]
 
@@ -23,3 +26,4 @@ arh = ["agents/*.md"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+testpaths = ["tests"]

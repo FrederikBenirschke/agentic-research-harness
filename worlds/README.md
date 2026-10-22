@@ -1,17 +1,45 @@
 # Worlds
 
-Panels the agent is asked to forecast. Each world has the three splits the harness
-expects; the agent's work dir gets only the early part of `public/train.parquet`.
-How the data was generated, and the hidden rule in each world, are kept out of this
-repository until the reported runs are finished.
+Each world is a panel of assets by dates with features `x00`, `x01`, ... and a
+target `y`. `arh init` copies `public/train.parquet` into the run's work
+directory. `sealed/holdout.parquet` is used only to compute the holdout score,
+which is stored but not returned to the agents. The real worlds also have
+`final/test.parquet`, which the harness does not read.
 
-| world | assets | features | train / validation / final dates |
+## Planted worlds
+
+Synthetic panels with known mechanisms. `sealed/truth.json` lists the
+mechanisms, the decoy feature and the oracle holdout R² (the R² of the true
+conditional mean). The generator scripts in this directory document each
+formula and regenerate the worlds.
+
+| world | generator | contents |
+|---|---|---|
+| `planted1` | `make_planted.py` | rank effect, regime-gated effect, momentum, decoy |
+| `planted1b` | `make_planted.py` | as planted1, seed 11 |
+| `planted2` | `make_planted2.py` | control for planted1: linear and rank effects, reversal, a regime feature with no effect, decoy |
+| `planted3` | `make_planted3.py` | U-shape, two-period delayed effect, cross-asset lead-lag, decoy |
+| `planted3b` | `make_planted3.py` | as planted3, seed 13, different feature indices |
+| `planted4` | `make_planted4.py` | interaction, sine, threshold, decoy |
+| `planted4b` | `make_planted4.py` | as planted4, seed 17, different feature indices |
+| `planted5` | `make_planted5.py` | four linear effects that appear only after preprocessing (per-date rank of a t(2) feature, clipping a feature with 1% spikes, per-date z-score of a feature with drifting scale, scaling a feature with sd 0.01 before ridge), a fat-tailed market factor that is 45–49% of var(y), no decoy; oracle holdout R² 0.049 |
+| `planted5b` | `make_planted5.py` | as planted5, seed 19, different feature indices; oracle holdout R² 0.052 |
+
+All planted worlds have 40 assets, 16 features, 500 training dates and 200
+holdout dates.
+
+## Real worlds
+
+The generation details and the mechanism in each real world are not in this
+repository.
+
+| world | assets | features | train / holdout / final dates |
 |---|---|---|---|
 | `rank100v2` | 60 | 28 | 525 / 225 / 250 |
 | `regime200` | 60 | 28 | 525 / 225 / 250 |
 | `seed0v2` | 24 | 40 | 525 / 225 / 250 |
 
-SHA-256 of every split (the run manifest pins the same hashes):
+SHA-256 of each split (the run manifest records the same hashes):
 
 ```
 d25a1ebfec540802927522094b5377e7136731b27c9433f5c8c7e1ee47042aa6  rank100v2/public/train.parquet

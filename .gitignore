@@ -4,3 +4,5 @@ __pycache__/
 runs/
 .pytest_cache/
 worlds/*/
+.claude/
+.DS_Store

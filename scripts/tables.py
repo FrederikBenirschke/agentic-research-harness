@@ -46,9 +46,14 @@ def cost(rows: list[dict]) -> str:
     return f"${statistics.fmean(c):.3f}" if c else "-"
 
 
+NAME = {"gpt-oss-32k": "gpt-oss (local)", "claude-haiku-5-5": "Haiku 5.5", "claude-sonnet-5-5": "Sonnet 5.5",
+        "claude-opus-5-5": "Opus 5.5", "claude-fable-5-1": "Fable 5.1"}
+PROMPT = {"v1": "original", "cur": "tuned"}
+
+
 def ablation() -> str:
-    out = ["| model | prompt | forecaster holdout/oracle (planted1b) | forecaster x07 gate | forecaster uses decoy | "
-           "analyst x07 gate | control holdout/oracle (planted2) | $/run |",
+    out = ["| model | prompt | score on planted1b | forecaster found x07 gate | analyst found x07 gate | "
+           "forecaster used decoy | score on planted2 (control) | cost per run |",
            "|---|---|---|---|---|---|---|---|"]
     for m in MODELS:
         for v in ("v1", "cur"):
@@ -58,9 +63,9 @@ def ablation() -> str:
             rows = load(held)
             f, a = agent(rows, "forecaster"), agent(rows, "analyst")
             c = agent(load(ctrl), "forecaster") if ctrl.exists() else []
-            out.append(f"| {m} | {v} | {mean_sd(ratios(f))} (n={len(f)}) | {hit(f, 'x07')} | "
-                       f"{frac(f, lambda r: r.get('decoy_in_model'))} | {hit(a, 'x07')} | {mean_sd(ratios(c))} | "
-                       f"{cost(rows) if m.startswith('claude') else 'local'} |")
+            out.append(f"| {NAME[m]} | {PROMPT[v]} | {mean_sd(ratios(f))} | {hit(f, 'x07')} | {hit(a, 'x07')} | "
+                       f"{frac(f, lambda r: r.get('decoy_in_model'))} | {mean_sd(ratios(c))} | "
+                       f"{cost(rows) if m.startswith('claude') else '-'} |")
     return "\n".join(out)
 
 
@@ -69,56 +74,63 @@ def avg(rows: list[dict], key: str, fmt: str = ".1f") -> str:
     return format(statistics.fmean(v), fmt) if v else "-"
 
 
-def behaviour() -> str:
-    """How each model works, pooled over both worlds: process, honesty and judge metrics per agent."""
-    out = ["| model | prompt | agent | n | turns | tool calls | Bash | tool errors | trials | wall s | out tokens | "
-           "numbers grounded | rerun ok | judge evidence | judge correct |", "|---|" * 15]
+def pooled(m: str, v: str, name: str) -> list[dict]:
+    rows = [r for w in ("planted1b", "planted2") if (f := RESULTS / "ablation" / f"{m}-{v}-{w}.jsonl").exists()
+            for r in load(f)]
+    a = agent(rows, name)
+    for r in a:
+        r["bash"] = (r.get("tools") or {}).get("Bash", 0)
+        r["correct"] = r.get("judge_correct") == "correct" if r.get("judge_correct") else None
+    return a
+
+
+def behaviour(name: str) -> str:
+    """Process, grounding and judge metrics for one agent per model and prompt, pooled over both worlds."""
+    last = "models tried" if name == "forecaster" else "script reproduces"
+    out = [f"| model | prompt | runs | turns | Bash calls | tool error rate | seconds | output tokens | "
+           f"numbers grounded | judge: correct | {last} |", "|" + "---|" * 11]
     for m in MODELS:
         for v in ("v1", "cur"):
-            rows = [r for w in ("planted1b", "planted2") if (f := RESULTS / "ablation" / f"{m}-{v}-{w}.jsonl").exists()
-                    for r in load(f)]
-            for name in ("analyst", "forecaster"):
-                a = agent(rows, name)
-                for r in a:
-                    r["bash"] = (r.get("tools") or {}).get("Bash", 0)
-                    r["correct"] = r.get("judge_correct") == "correct" if r.get("judge_correct") else None
-                out.append(f"| {m} | {v} | {name} | {len(a)} | {avg(a, 'turns')} | {avg(a, 'tool_calls')} | "
-                           f"{avg(a, 'bash')} | {avg(a, 'tool_error_rate', '.2f')} | "
-                           f"{avg(a, 'trials') if name == 'forecaster' else '-'} | {avg(a, 'wall_s', '.0f')} | "
-                           f"{avg(a, 'out_tokens', '.0f')} | {avg(a, 'numbers_grounded', '.2f')} | "
-                           f"{frac(a, lambda r: r.get('rerun_ok')) if name == 'analyst' else '-'} | "
-                           f"{avg(a, 'judge_evidence')} | {avg(a, 'correct', '.2f')} |")
-    return "\n".join(out[:1] + ["|" + "---|" * 15] + out[2:])
+            a = pooled(m, v, name)
+            if not a:
+                continue
+            extra = avg(a, "trials") if name == "forecaster" else frac(a, lambda r: r.get("rerun_ok"))
+            out.append(f"| {NAME[m]} | {PROMPT[v]} | {len(a)} | {avg(a, 'turns')} | {avg(a, 'bash')} | "
+                       f"{avg(a, 'tool_error_rate', '.2f')} | {avg(a, 'wall_s', '.0f')} | "
+                       f"{avg(a, 'out_tokens', '.0f')} | {avg(a, 'numbers_grounded', '.2f')} | "
+                       f"{avg(a, 'correct', '.2f')} | {extra} |")
+    return "\n".join(out)
 
 
-PLANTED3 = [  # (file stem, world, arm description)
-    ("claude-haiku-5-5-cur", "planted3", "Haiku, current prompts"),
-    ("claude-sonnet-5-5-cur", "planted3", "Sonnet, current prompts"),
-    ("claude-opus-5-5-cur", "planted3", "Opus, current prompts"),
-    ("claude-haiku-5-5-cur-nosummary", "planted3", "Haiku, no data summary"),
-    ("claude-haiku-5-5-eda", "planted3", "Haiku, + EDA line"),
-    ("claude-haiku-5-5-eda-nosum", "planted3", "Haiku, + EDA line, no summary"),
-    ("claude-haiku-5-5-move", "planted3", "Haiku, + confound move"),
-    ("claude-haiku-5-5-3b-cur", "planted3b", "Haiku, current prompts"),
-    ("claude-haiku-5-5-3b-move", "planted3b", "Haiku, + confound move"),
-    ("claude-haiku-5-5-chain", "planted3", "forecaster given one move-arm finding"),
-    ("claude-haiku-5-5-control", "planted3", "forecaster given a finding naming all three"),
+PLANTED3 = [  # (file stem, world, model, prompt or condition)
+    ("claude-haiku-5-5-cur", "planted3", "Haiku 5.5", "tuned"),
+    ("claude-sonnet-5-5-cur", "planted3", "Sonnet 5.5", "tuned"),
+    ("claude-opus-5-5-cur", "planted3", "Opus 5.5", "tuned"),
+    ("claude-haiku-5-5-cur-nosummary", "planted3", "Haiku 5.5", "tuned, no data summary"),
+    ("claude-haiku-5-5-eda", "planted3", "Haiku 5.5", "tuned + EDA instruction"),
+    ("claude-haiku-5-5-eda-nosum", "planted3", "Haiku 5.5", "tuned + EDA instruction, no data summary"),
+    ("claude-haiku-5-5-move", "planted3", "Haiku 5.5", "tuned + squares instruction"),
+    ("claude-haiku-5-5-3b-cur", "planted3b", "Haiku 5.5", "tuned"),
+    ("claude-haiku-5-5-3b-move", "planted3b", "Haiku 5.5", "tuned + squares instruction"),
+    ("claude-haiku-5-5-chain", "planted3", "Haiku 5.5", "forecaster given one finding from the squares arm"),
+    ("claude-haiku-5-5-control", "planted3", "Haiku 5.5", "forecaster given a note naming all three mechanisms"),
 ]
 
 
 def planted3() -> str:
-    out = ["| world | arm | analyst finds U-shape | analyst finds lag 2 | forecaster holdout/oracle | "
-           "forecaster uses decoy |", "|---|---|---|---|---|---|"]
-    for stem, world, arm in PLANTED3:
+    out = ["| world | model | prompt or condition | analyst found U-shape | analyst found lag 2 | score (min–max) | "
+           "forecaster used decoy |", "|---|---|---|---|---|---|---|"]
+    for stem, world, model, arm in PLANTED3:
         rows = load(RESULTS / "planted3" / f"{stem}.jsonl")
         a, f = agent(rows, "analyst"), agent(rows, "forecaster")
         r = ratios(f)
-        rng = f"{min(r):.2f}–{max(r):.2f}" if r else "-"
-        out.append(f"| {world} | {arm} | {hit(a, 'ushape')} | {hit(a, 'lag2')} | {rng} | "
+        lo, hi = (f"{min(r):.2f}", f"{max(r):.2f}") if r else ("-", "-")
+        rng = lo if lo == hi else f"{lo}–{hi}"
+        out.append(f"| {world} | {model} | {arm} | {hit(a, 'ushape')} | {hit(a, 'lag2')} | {rng} | "
                    f"{frac(f, lambda r: r.get('decoy_in_model'))} |")
     return "\n".join(out)
 
 
 if __name__ == "__main__":
-    print("## Model x prompt ablation\n\n" + ablation() + "\n\n## Behaviour by model\n\n" + behaviour() +
-          "\n\n## planted3: mechanisms no prompt names\n\n" + planted3())
+    print("## Tuned prompts on new data\n\n" + ablation() + "\n\n## Forecasters\n\n" + behaviour("forecaster") +
+          "\n\n## Analysts\n\n" + behaviour("analyst") + "\n\n## planted3\n\n" + planted3())

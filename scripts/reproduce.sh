@@ -3,6 +3,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=${PY:-.venv/bin/python}
-for g in worlds/make_planted.py worlds/make_planted2.py worlds/make_planted3.py; do $PY "$g"; done
+for g in worlds/make_planted.py worlds/make_planted2.py worlds/make_planted3.py worlds/make_planted4.py worlds/make_planted5.py; do $PY "$g"; done
 $PY scripts/tables.py
 $PY scripts/figure.py

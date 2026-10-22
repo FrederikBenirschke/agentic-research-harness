@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tables import MODELS, PLANTED3, RESULTS, agent, load, ratios
+from tables import MODELS, PLANTED3, PROMPT, RESULTS, agent, load, ratios
 
 OUT = Path(__file__).resolve().parents[1] / "docs" / "results.png"
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
@@ -32,7 +32,7 @@ def style(ax):
 
 
 def ablation(ax):
-    """Per-run forecaster holdout/oracle on held-out planted1b: v1 vs cur prompt, per model."""
+    """Per-run forecaster holdout/oracle on held-out planted1b: original vs tuned prompt, per model."""
     for i, m in enumerate(MODELS):
         for v, color, dy in (("v1", V1, 0.17), ("cur", CUR, -0.17)):
             r = ratios(agent(load(RESULTS / "ablation" / f"{m}-{v}-planted1b.jsonl"), "forecaster"))
@@ -40,7 +40,7 @@ def ablation(ax):
             for x in r:   # runs often land on the same score: one dot per value, labelled with its count
                 counts[round(x, 2)] = counts.get(round(x, 2), 0) + 1
             ax.scatter(list(counts), [i + dy] * len(counts), s=42, color=color, edgecolor=SURFACE, linewidth=1.5,
-                       zorder=5, label=f"{v} prompt" if i == 0 else None)
+                       zorder=5, label=f"{PROMPT[v]} prompt" if i == 0 else None)
             for x, n in counts.items():
                 if n > 1:
                     ax.text(x + 0.012, i + dy, f"×{n}", va="center", fontsize=8, color=MUTED)
@@ -48,22 +48,24 @@ def ablation(ax):
     ax.set_yticks(range(len(MODELS)), [SHORT[m] for m in MODELS], color=INK)
     ax.invert_yaxis()
     ax.set_xlim(0.3, 1.02)
-    ax.set_xlabel("forecaster holdout R² / oracle (dots = runs, ×n = n runs at that value; bar = mean)", color=MUTED, fontsize=9)
-    ax.set_title("Held-out world planted1b: prompt v1 vs cur", loc="left", color=INK, fontsize=11)
-    ax.legend(frameon=False, fontsize=9, loc="upper left", labelcolor=INK)
+    ax.set_xlabel("score: forecaster holdout R² / oracle (dots = runs, ×n = n runs at that value; bar = mean)",
+                  color=MUTED, fontsize=9)
+    ax.set_title("planted1b, not used for tuning: original vs tuned prompt", loc="left", color=INK, fontsize=11)
+    ax.legend(frameon=False, fontsize=9, loc="lower left", labelcolor=INK)
     style(ax)
 
 
 def discovery(ax):
     """planted3 analysts that found the U-shape (no prompt names it), per arm."""
-    arms = [(arm if w == "planted3" else f"{arm} (planted3b)", load(RESULTS / "planted3" / f"{s}.jsonl"))
-            for s, w, arm in PLANTED3 if "forecaster" not in arm]
+    arms = [(f"{model.split()[0]}, {arm}" + ("" if w == "planted3" else " (planted3b)"),
+             load(RESULTS / "planted3" / f"{s}.jsonl"))
+            for s, w, model, arm in PLANTED3 if "forecaster" not in arm]
     names, hits = [], []
     for name, rows in arms:
         a = agent(rows, "analyst")
         names.append(name)
         hits.append(sum(any("ushape" in h for h in r.get("mechanisms_hit") or []) for r in a))
-    colors = [CUR if "move" in n else MUTED for n in names]
+    colors = [CUR if "squares" in n else MUTED for n in names]
     ax.barh(range(len(names)), hits, height=0.6, color=colors, zorder=3)
     for i, h in enumerate(hits):
         ax.text(h + 0.08, i, f"{h}/5", va="center", fontsize=9, color=INK)
@@ -72,7 +74,7 @@ def discovery(ax):
     ax.set_xlim(0, 5.6)
     ax.set_xticks(range(6))
     ax.set_xlabel("analyst runs (of 5) that found the U-shape in x04", color=MUTED, fontsize=9)
-    ax.set_title("planted3: a mechanism no prompt names", loc="left", color=INK, fontsize=11)
+    ax.set_title("planted3: a U-shape that no prompt describes", loc="left", color=INK, fontsize=11)
     style(ax)
 
 
