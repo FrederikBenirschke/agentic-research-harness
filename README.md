@@ -1,5 +1,21 @@
 # agentic-research-harness
 
+LLM agents (Claude Agent SDK) look for planted mechanisms in synthetic panels
+with a known truth, so every claim and forecast is graded against the answer.
+
+- **Prompt tuning transfers to held-out seeds:** forecaster score rose from
+  0.70 to 0.81 of the oracle for Haiku and from 0.80 to 0.95 for Opus, with no
+  loss on a control world.
+- **A reference primer pushes out methods the model knows:** with the primer,
+  Haiku's plans drop PCA from 5/5 to 0/5. A separate plan call before the
+  primer restores them: on planted8, PCA in agent code went from 1 of 30
+  runs to 17 of 18.
+- **Sealed exam:** on six worlds built by a separate agent and run once with
+  frozen prompts, Opus scored 0.92 or more of the oracle on every world with
+  signal, and no model overfit the null world.
+- **The agents cannot see the answers:** an audit of 472 run traces and a
+  deliberate break-in attempt found no read of the holdout or truth files.
+
 ## Introduction
 
 We test whether LLM agents find structure in data that they were not told to
@@ -119,7 +135,7 @@ analyst to try ([Access](#access-to-the-holdout-and-truth-files)).
 
 ## Code
 
-The core is about 780 lines of Python and the eval module about 410.
+The core is about 850 lines of Python and the eval module about 420.
 
 | agent | sees | tools | writes |
 |---|---|---|---|
@@ -386,10 +402,10 @@ the others (Opus 0.57 to 0.82).
 
 `worlds/exam/exam1` to `exam6` were built by a separate agent, and nobody
 tuning the prompts opened their sealed files or generator before the pass
-([protocol](worlds/exam/PROTOCOL.md)). We froze two forecaster arms (hashes in
-`runs/evals/exam/FROZEN.txt`): the primer only (`explore3`) and the separate
+([protocol](docs/exam.md)). We froze two forecaster arms (hashes in
+[docs/exam.md](docs/exam.md)): the primer only (`explore3`) and the separate
 plan call (`plancall`). Each arm ran 3 times per world with Haiku and Opus, 72
-runs in all, and every run is in `runs/evals/exam/ledger.jsonl`, including the
+runs in all, and every run is in [results/exam/ledger.jsonl](results/exam/ledger.jsonl), including the
 4 that hit the turn limit or timed out (shown as –).
 
 | world | Haiku, primer only | Haiku, plan call | Opus, primer only | Opus, plan call |
@@ -502,12 +518,19 @@ scripts/ablation.sh           # the full model x prompt grid (~$30)
 ```
 
 `ARH_SUMMARY=none` removes the per-feature data summary (the no-summary arm).
-`evals/*.json` defines the eval conditions, `evals/prompts/{v1,cur,eda,move}`
-contains the prompt versions, and [docs/eval-log.md](docs/eval-log.md) has the full eval log.
+`evals/*.json` defines the eval conditions and `evals/prompts/<arm>/` holds the
+prompt versions: `v1`, `cur`, `eda` and `move` for Sections 1 to 3, and
+`explore3`, `plancall`, `planreview` and the other primer arms for Sections 4
+and 5. A `plan:` line in a prompt's frontmatter turns on the separate plan
+call, and [docs/eval-log.md](docs/eval-log.md) has the full eval log.
 
 ## Next
 
-We plan to run several analysts in parallel, each assigned one direction
-(nonlinearity, lags, cross-asset, regimes), and to measure how the number of
-true mechanisms found grows with the number of analysts. The comparison is
-the same number of analysts without assigned directions.
+- A second exam pass on a fresh set built blind, including worlds with factor
+  and industry structure, to test the plan call's gain outside planted8c. The
+  exam generator's oracle should also use past y (the exam2 gap).
+- The separate plan call for the analyst and ideator.
+- Several analysts in parallel, each assigned one direction (nonlinearity,
+  lags, cross-asset, regimes), against the same number of analysts without
+  assigned directions, to measure how the number of true mechanisms found
+  grows with the number of analysts.

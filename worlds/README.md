@@ -39,10 +39,11 @@ are not read while tuning.
 
 ## Exam worlds
 
-`exam/exam1` to `exam/exam6` are a sealed test set, built by an agent so that
-whoever tunes the prompts has not seen them. Only frozen prompt arms run on
-them, and every run goes to `runs/evals/exam/ledger.jsonl`. See
-[exam/PROTOCOL.md](exam/PROTOCOL.md).
+`exam/exam1` to `exam/exam6` were a sealed test set, built by an agent so that
+whoever tunes the prompts had not seen them. They are not in the repository.
+After pass 1 they were retired to dev. See [docs/exam.md](../docs/exam.md) for
+the protocol and [results/exam/ledger.jsonl](../results/exam/ledger.jsonl) for
+every run.
 
 All planted worlds have 40 assets, 16 features, 500 training dates and 200
 holdout dates.
