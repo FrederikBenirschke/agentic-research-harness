@@ -1,0 +1,16 @@
+{
+ "world": "../worlds/exam/exam3",
+ "conditions": {
+  "forecaster-opusnote": {
+   "agent": "forecaster",
+   "about": "positive control: Haiku forecaster given the Opus explore3 r0 forecast note (within date x x06 demeaning, vol scaling)",
+   "notes": [
+    {
+     "kind": "finding",
+     "author": "analyst",
+     "text": "BEST (m5.py): CV R2 .0150, folds [.0100 .0143 .0126 .0169 .0212], rank IC .153, Q5-Q1 Sharpe 1.41. N=7 scored trials. Beats raw-OLS baseline (.0028) in every fold.\n\nMODEL: forecast = sigma_it*(b1*x11w + b2*x17d), demeaned per date.\n- x11w = x11 minus its mean within date x x06 group (x06 is constant per asset; 10 groups).\n- x17d = x17 minus its date mean.\n- sigma = sqrt of the EWM (half-life 5) of the asset's past squared date-demeaned y, taken from history.\n- b = OLS of (date-demeaned y)/sigma on [x11w, x17d], fitted in fit. b\u2248[.146,.075], stable across quarters; inner map-back slope \u22481.\n\nFINDINGS:\n1. Only x11 and x17 carry signal. The other 17 features: |IC|<.007 with sign flips, no within-group signal, no interactions with x11/x17, no vol-forecast value.\n2. The date-common part (30% of var y) is not forecastable, so the target is date-demeaned and forecasts are zero-mean per date.\n3. Slope scales with asset vol (x11: .044/.057/.102 across vol terciles at constant corr), so y \u2248 sigma*(b'x + eps). Half-life 5 \u2248 7 > 10 > 20 > expanding; power on sigma is 1. Blended horizons, abs-EWM, shrinking to long-run vol and x03 as a vol predictor were all worse.\n4. KEY: 71% of x11's variance is a date x group component with zero predictive power. The within-group part has corr .146 with vol-scaled y in both halves (.0051 -> .0143).\n5. x17 has only a 7% group share, and its group mean predicts group returns (corr .04 in both halves), so it is date-demeaned, not group-demeaned (+.0007).\n6. Everything else checked out flat: shapes linear to the 1/99% tails; slopes homogeneous across groups and dispersion states; past returns and lagged x11 explained by x11w; asset alphas anti-persist; the residual return factor has unstable loadings.\n\nTRIALS (mean; folds):\n#1 raw OLS y~x11,x17: .0028 [.005 .002 .0035 .0028 .0009]\n#2 date-demeaned y and x: .0032 [.0009 .0043 .004 .0031 .0038]\n#3 + vol-scaled target (half-life 20): .0051 [.0019 .006 .0056 .0052 .007]\n#4 group-demeaned x11, x17 and target, half-life 5: .0143 [.0086 .0147 .0125 .0163 .0196]\n#5 x11 within group, x17 within date (BEST): .0150 [.0100 .0143 .0126 .0169 .0212]\n#6 + 17 weak features, ridge on those only: .0149 [.0098 .0142 .0126 .0168 .0209]\n#7 sign pose (logistic z>0, inner map-back): .0150 [.0101 .0144 .0126 .0167 .0213] (tie)\n\nRejected offline on inner splits: GBM on residuals over all features (overfits, .0170 -> .0149); Huber; leave-one-out group demeaning; x11 group mean as a regressor (coef 0); GLS on x \u00d7 several vol horizons; trailing asset mean of x11w.\n\nNEXT: the signal side looks saturated. Remaining room is likely in sigma (a GARCH-like estimator, or separate vol for the group and idiosyncratic parts). Also worth trying: shrinkage-PCA neutralisation of the training target against the hidden return factor. Expected gain \u2264 .001."
+    }
+   ]
+  }
+ }
+}
