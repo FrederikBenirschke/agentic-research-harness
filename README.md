@@ -90,9 +90,28 @@ second seed. The line mentions squares, which is the planted form, so we still
 need to test it on a world with a different nonlinearity
 ([Section 3](#3-mechanisms-that-no-prompt-describes)).
 
+A reference primer can push out methods the model already knows. Asked with
+no primer to plan its checks of a returns panel, Haiku lists PCA and
+industry clustering in 5 of 5 plans. With the primer in the prompt, it lists
+PCA in 0 of 5 and industries in 0 to 2 of 5, wherever the primer is placed.
+Its plans stay about the same length, so the primer's items take the place of
+its own. Opus lists both in 5 of 5 plans in every setting, but in agent runs
+on planted8 it did not run PCA in any of 6 runs
+([Section 4](#4-the-primer-pushes-out-what-the-model-knows)).
+
 In planted3 the forecaster's score depends on what the analysts find. A
 forecaster given a note that names all three mechanisms matches the oracle,
 and one given a single analyst finding scores 0.56 to 0.63 of the oracle.
+
+On six sealed exam worlds, built by a separate agent and run once with
+frozen prompts, Opus scored 0.92 to 1.0 or more of the oracle on the five
+worlds with signal, and neither model overfit the null world. The separate plan
+call scored the same as the primer alone there; its gain shows only on planted8c,
+where the method needed is missing from the primer
+([Section 5](#5-sealed-exam)). Some exam scores exceed 1.0 of the oracle.
+On exam2 the stated oracle leaves out information in past y, so it is not the
+best feasible forecast. On exam5 the oracle's own holdout R² is low by chance
+(0.026 against 0.038 on the training dates). Neither is a grading error.
 
 We also checked that the agents cannot read the holdout, the truth file or
 the generators, by auditing the traces of 472 runs and by instructing an
@@ -279,6 +298,135 @@ In the order in which we ran these conditions:
 5. A forecaster given a note that names all three mechanisms scores 1.00. A
    forecaster given one finding from the squares condition, which names only
    the U-shape, scores 0.56 to 0.63 and uses the decoy in 2 of 5 runs.
+
+### 4. The primer pushes out what the model knows
+
+The later prompt versions (`explore2`, `explore3`) append a reference primer:
+a map of quant research practice (the scoring rule, tails, per-date demeaning,
+proxies, state dependence, multiple testing). It is meant as a reminder of
+things to check. To see whether it also changes what the model would do on its
+own, we gave the model the world's README and asked it, with no tools and no
+data, to list the structures it would check for in a panel of asset returns,
+with a concrete check for each. We sampled 5 plans per setting and counted
+the plans that include PCA or an eigenvalue check of the return covariance,
+and the plans that include industry or cluster structure.
+
+| model | primer | plans with PCA | plans with industries |
+|---|---|---|---|
+| Haiku 5.5 | none | 5/5 | 5/5 |
+| Haiku 5.5 | in the system prompt | 0/5 | 0–2/5 |
+| Haiku 5.5 | in the user message, before the question | 0/5 | 0–2/5 |
+| Haiku 5.5 | in the user message, after the question | 0/5 | 0–2/5 |
+| Haiku 5.5 | "write your own list, then what the notes add" in one answer | 2/5 | 1/5 |
+| Haiku 5.5 | primer reworded as additive ("in addition to what you know") | 1/5 | 1/5 |
+| Opus 5.5 | any of the above | 5/5 | 5/5 |
+
+The placement of the primer does not matter; its presence does. Haiku's plans
+have about 15 to 17 items with or without the primer (Opus's about 22), so the
+primer's items replace Haiku's own items instead of adding to them. The
+primer's per-date mean m_t appears in 5 of 5 plans with the primer and in 1 or
+2 of 5 without it. Asking for the model's own list first in the same answer
+helps little, and Opus notes in that setting that its first list "isn't fully
+independent" of the notes it had already read.
+
+Opus keeps its own items in the plan, but in agent runs it does not act on
+them. planted8 (built by `worlds/make_planted7.py`) is a returns panel where
+only the full chain pays: divide out each asset's volatility, remove two
+latent factors, cluster the residual correlations into industries, then model
+the residual. In 6 Opus runs on planted8 with the primer prompt (`explore3`),
+without the primer (`bare`), or with an instruction to write its own plan first
+(`ownfirst`), no run did PCA or a multi-factor model, and every holdout score
+was close to zero. Several runs fitted a one-factor market beta, which on its
+own does not improve the walk-forward CV, and dropped the direction.
+
+Related effects are known. In human memory research, giving people part of a
+list as cues lowers their recall of the rest (part-list cueing inhibition), and
+designers shown an example copy its features (design fixation). For language
+models, irrelevant context lowers accuracy (Shi et al. 2023), and models tend
+to follow the context when it conflicts with what they know (Xie et al. 2023).
+We have not found the fixed-length displacement measured as above.
+
+The fix we are testing moves the plan out of the primer's context. A separate
+call with no primer writes the model's own plan (`plan:` in the prompt
+frontmatter, arm `plancall`). A second call shows that plan with the primer and
+asks only for what the primer adds (`review:`, arm `planreview`), and the
+agent runs with both lists. Arm `planreview-lean` also drops the primer from
+the agent's prompt. The separate plan call lists PCA and industries in 8 of 8
+plans.
+
+With the separate plan call, the agents also run these checks. We counted the
+runs whose code computes an eigendecomposition or SVD of the returns, or
+clusters assets. On planted8 this rose from 1 of 30 runs without a plan call
+(Opus and Haiku, `explore3`, `bare`, `ownfirst`) to 17 of 18 with one. The
+holdout scores stayed near zero (at most 0.21 of the oracle). The agents found
+the two large factors (eigenvalues 13.4 and 9.5) but not the industries, whose
+eigenvalues (2.1 to 1.6) sit at the Marchenko–Pastur noise edge (about 1.7).
+Fitting the full chain ourselves (vol, two factors, industries, residual)
+gives 0.44 of the oracle on the holdout, and every shorter chain gives at most
+0.2. planted8c is planted8 with a stronger industry factor, whose eigenvalues
+(4.6 to 3.5) are well above the edge.
+
+| world | model | prompt | runs with PCA / clustering | holdout / oracle |
+|---|---|---|---|---|
+| planted8c | Opus 5.5 | primer only (`explore3`) | 2/3 / 0/3 | −0.08, 0.01, 0.00 |
+| planted8c | Opus 5.5 | separate plan call (`plancall`) | 3/3 / 3/3 | 0.67, 0.15, 0.24 |
+| planted8c | Opus 5.5 | plan call, review, no primer (`planreview-lean`) | 3/3 / 2/3 | −0.23, 0.35, −0.03 |
+| planted8c | Haiku 5.5 | primer only (`explore3`) | 0/3 / 0/3 | −0.84, −0.09, −0.06 |
+| planted8c | Haiku 5.5 | separate plan call (`plancall`) | 2/3 / 1/3 | −0.18, −0.12, −0.12 |
+| planted8c | Haiku 5.5 | plan call, review, no primer (`planreview-lean`) | 2/3 / 1/3 | −0.10, 0.03, 0.18 |
+
+With the plan call, every Opus run clustered the assets and all three scored
+above zero. With the primer only, no Opus run clustered and the scores are
+about zero. With n=3 per cell this is a first result. Haiku tries the steps
+but does not turn them into a model that holds on the holdout. On planted7,
+where shorter chains already pay, the plan arms score in the same range as
+the others (Opus 0.57 to 0.82).
+
+### 5. Sealed exam
+
+`worlds/exam/exam1` to `exam6` were built by a separate agent, and nobody
+tuning the prompts opened their sealed files or generator before the pass
+([protocol](worlds/exam/PROTOCOL.md)). We froze two forecaster arms (hashes in
+`runs/evals/exam/FROZEN.txt`): the primer only (`explore3`) and the separate
+plan call (`plancall`). Each arm ran 3 times per world with Haiku and Opus, 72
+runs in all, and every run is in `runs/evals/exam/ledger.jsonl`, including the
+4 that hit the turn limit or timed out (shown as –).
+
+| world | Haiku, primer only | Haiku, plan call | Opus, primer only | Opus, plan call |
+|---|---|---|---|---|
+| exam1 | 0.64, 0.67, 0.67 | 0.61, 0.67, 0.85 | 0.96, 1.00, 0.99 | 0.99, 0.96, 1.00 |
+| exam2 | 0.55, 0.90, 0.56 | 0.78, 0.89, – | 1.04, 1.04, 1.04 | 1.04, 1.04, 1.04 |
+| exam3 | 0.08, 0.04, 0.11 | 0.14, 0.09, 0.03 | 0.96, 0.95, 0.94 | 0.92, 0.92, – |
+| exam4 (null, raw R²) | −0.002, −0.003, −0.003 | −0.002, −0.008, −0.003 | −0.003, 0.007, – | −0.003, −0.003, −0.005 |
+| exam5 | 0.91, 1.12, 1.06 | 1.04, 1.29, 1.10 | 1.19, 1.11, 1.33 | 1.29, 1.01, 1.18 |
+| exam6 | 0.95, 0.81, 0.84 | 0.89, 0.93, 0.69 | 0.96, 0.96, – | 0.96, 0.96, 0.96 |
+
+- Opus is close to the oracle on every world with signal, with either arm.
+  Haiku is lower everywhere, and on exam3 it scores 0.03 to 0.14 while Opus
+  scores 0.92 to 0.96.
+- The plan call does not change the scores on these worlds. Together with
+  planted8c, this suggests it helps where the needed method is missing from the
+  primer and costs nothing where the primer already covers it. None of the
+  exam worlds has factor or industry structure, so the exam does not test that
+  case directly.
+- On the null world exam4, every forecast has a holdout R² near zero, so
+  neither model overfits.
+- Scores above 1 on exam2 and exam5 have two different causes, which we found
+  after the pass by reading the retired generator.
+  - On exam2 the stated oracle is not the best feasible forecast. It filters
+    the latent signal from the noisy feature only, but past y also carries the
+    signal. Adding a smoothed past-y term to the oracle raises its holdout R²
+    from 0.0935 to 0.0962, and Opus's 0.0975 is then 1.01 of it.
+  - On exam5 the oracle is the true conditional mean, and its holdout R² is
+    low by chance. It is 0.0256 on the holdout and 0.0375 on the training
+    dates, and a bootstrap over holdout dates gives it a standard deviation of
+    0.010. The forecasts (0.026 to 0.034) are within that noise. Their CV
+    scores (about 0.03) are below the oracle's training R².
+- The Opus runs cost $72 in all (about $2 to $3 per run) and the Haiku runs
+  $2.60 (about $0.07 per run).
+
+After this pass the exam worlds are retired to development use; the next pass
+needs a fresh set with new seeds.
 
 ### Access to the holdout and truth files
 

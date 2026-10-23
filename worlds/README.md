@@ -24,6 +24,25 @@ formula and regenerate the worlds.
 | `planted4b` | `make_planted4.py` | as planted4, seed 17, different feature indices |
 | `planted5` | `make_planted5.py` | four linear effects that appear only after preprocessing (per-date rank of a t(2) feature, clipping a feature with 1% spikes, per-date z-score of a feature with drifting scale, scaling a feature with sd 0.01 before ridge), a fat-tailed market factor that is 45–49% of var(y), no decoy; oracle holdout R² 0.049 |
 | `planted5b` | `make_planted5.py` | as planted5, seed 19, different feature indices; oracle holdout R² 0.052 |
+| `planted6` | `make_planted6.py` | scheduled events: a jump on each asset's announcement date (partly predictable from a drifting revision), post-announcement drift, decoy |
+| `planted6b` | `make_planted6.py` | as planted6, seed 23, different feature indices |
+| `planted7` | `make_planted7.py` | returns with per-asset volatility, two latent factors and five latent industries; the forecastable part is residual reversal and a feature that works relative to its industry; decoy that loads on a drifting factor |
+| `planted7b` | `make_planted7.py` | as planted7, seed 29, different feature indices |
+| `planted8` | `make_planted7.py` | as planted7 with larger factor spread and an industry-level part in the feature, so only vol + factors + industries + residual pays; industry eigenvalues at the noise edge |
+| `planted8b` | `make_planted7.py` | as planted8, seed 31, different feature indices |
+| `planted8c` | `make_planted7.py` | planted8 with a stronger industry factor (eigenvalues well above the noise edge) |
+
+`make_random.py SEED` draws a procedural world (0 to 5 mechanisms from a
+library, decoys, noise level, noise features) into `rand/r<SEED>`. Seeds below
+1000 are for development; seeds from 100000 are exam worlds whose truth files
+are not read while tuning.
+
+## Exam worlds
+
+`exam/exam1` to `exam/exam6` are a sealed test set, built by an agent so that
+whoever tunes the prompts has not seen them. Only frozen prompt arms run on
+them, and every run goes to `runs/evals/exam/ledger.jsonl`. See
+[exam/PROTOCOL.md](exam/PROTOCOL.md).
 
 All planted worlds have 40 assets, 16 features, 500 training dates and 200
 holdout dates.
