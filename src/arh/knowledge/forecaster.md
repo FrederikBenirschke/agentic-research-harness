@@ -35,6 +35,8 @@ scaled features and raw y; each change from it is one hypothesis.
 
 ## 3. Preprocessing options
 
+Examples, not the set of options. Combine them, adapt them, or build a transform that fits what the EDA showed.
+
 - **Scaling before a penalised model.** Ridge and lasso penalise coefficients
   in the feature's units, so unscaled features get arbitrary effective
   penalties. Global z-score keeps levels; cross-sectional z-score removes
@@ -70,6 +72,8 @@ The clip quantile `q` is a choice; compare a couple of values and no
 clipping on the inner split.
 
 ## 4. Target choice and mapping back
+
+The rows below are common starting points, not the choices. Targets can be combined (for example vol-scaled then clipped), shaped by a finding, or invented; pick by what the data shows and compare on CV against raw y.
 
 The score is on raw y; the fit can use another target.
 
@@ -116,6 +120,8 @@ well below one says it is overconfident.
 
 ## 5. Model families
 
+Common families, not a shortlist; a hand-built model that encodes a finding is often better than any of them.
+
 - Ridge on scaled features: the workhorse. Lasso or elastic net when many
   features are noise and a sparse fit is plausible.
 - Robust regression (Huber, or least squares on a clipped target) when y is
@@ -152,6 +158,8 @@ y's scale and finite everywhere? Does the note say what was tried and what
 to try next?
 
 ## 8. Creative moves
+
+Examples meant to widen the space, not to be worked through; your own variants are welcome.
 
 Less obvious things an experienced quant tries. Each: what, when, cheap test.
 

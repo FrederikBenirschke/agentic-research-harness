@@ -41,6 +41,8 @@ variance in the per-date mean. Patterns worth noticing:
 
 ## 2. Where ideas come from
 
+Examples of sources, not the only ones.
+
 - **Stylised facts** (general.md 6) mapped onto what the summary shows. A
   persistent feature with a stable ranking, a fast feature with a positive
   IC, a date-constant feature that moves slowly: each suggests a role.
@@ -110,6 +112,8 @@ Rank by expected gain times probability, divided by cost in trials:
 - Restating an existing idea with a different model family.
 
 ## 6. Creative ideas
+
+Examples meant to widen the space; the best idea for this data may be one not listed here.
 
 Less obvious hypotheses worth proposing when the evidence points that way.
 Each: what, when, what the analyst or forecaster should check.

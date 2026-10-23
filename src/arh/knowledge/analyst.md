@@ -28,6 +28,8 @@ Each later question is cheap once the earlier one is answered.
 
 ## 2. Recipes
 
+Examples of measurements, not a set to run. Adapt them, or design the measurement the question needs.
+
 ### Quantile sort with per-date spreads
 
 ```python
@@ -140,6 +142,8 @@ than assets per date can support; an "effect" that is a proxy of a feature
 already in a finding.
 
 ## 4. Creative measurements
+
+Examples meant to widen the space; measurements you invent for this data are welcome.
 
 Less obvious things an experienced quant measures. Each: what, when, cheap test.
 

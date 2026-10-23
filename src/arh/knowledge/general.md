@@ -7,6 +7,13 @@ hypothesis to test against a simple baseline, never as a step to execute or
 a default to adopt. Numbers quoted here are orders of magnitude from other
 panels, not targets, and nothing here is a tuning value to copy.
 
+Every list and table in these files is a set of examples to get you started, not a menu to
+pick from. The right move on a given panel is often not listed: a combination of two items,
+a variant shaped by what your own EDA showed, or something you construct yourself. Creative,
+unlisted approaches are explicitly welcome. "It was in the table" is not a reason to use
+something; what you saw in the data is. When you do use an item from here, say what in the
+data made it fit, and compare it with at least one alternative you thought of yourself.
+
 Notation: date t, asset i, features `x..` known at the close of t, target
 `y_it` = return of asset i over the period after t. The score is walk-forward
 R² on raw y, pooled over the rows of a test block:
@@ -127,6 +134,8 @@ rule.
 
 ## 3. EDA fundamentals
 
+Examples of checks, not a checklist; add the ones this data calls for.
+
 Cheap checks that bear on model choice. The analyst file has the recipes.
 
 - Distributions: per feature and for y, SD, skew, excess kurtosis, extreme
@@ -186,6 +195,8 @@ stronger evidence than a higher mean. Formal versions: deflated Sharpe
 ratio (Bailey and López de Prado), t-stat hurdles (Harvey, Liu and Zhu).
 
 ## 6. Stylised facts to test
+
+Examples from other panels; this one may differ, and its own oddities matter more.
 
 In anonymised data any of these may be absent. They are hypotheses.
 
