@@ -31,7 +31,32 @@ def summarize(train: pl.DataFrame) -> str:
                      f"corr {pooled:+.3f}, " + ("date-constant (same for all assets)" if constant
                                                  else f"rank_ic {rank_ic:+.3f}") +
                      f", ac1 {ac:+.2f}, distinct {col.n_unique()}")
+    if os.environ.get("ARH_SUMMARY") == "groups":  # eval arm: also decompose features by each group-code column
+        lines += _group_lines(train, feats)
     return "\n".join(lines)
+
+
+def _group_lines(train: pl.DataFrame, feats: list[str]) -> list[str]:
+    """For each column that is constant per asset with few values (a group code), each feature's share of
+    within-date variance in its date x group mean, and the rank IC of the deviation from that mean."""
+    codes = [g for g in feats if train[g].n_unique() <= 50
+             and train.group_by("asset").agg(pl.col(g).n_unique()).select(pl.col(g).max()).item() == 1]
+    out = []
+    for g in codes:
+        xs = [f for f in feats if f not in codes]
+        d = train.with_columns(*[(pl.col(f) - pl.col(f).mean().over("date")).alias(f) for f in xs])
+        d = d.with_columns(*[(pl.col(f) - pl.col(f).mean().over(["date", g])).alias(f"{f}_w") for f in xs])
+        r = d.with_columns(pl.col([f"{f}_w" for f in xs] + ["y"]).rank().over("date"))
+        parts = []
+        for f in xs:
+            v = d[f].var()
+            share = 1 - d[f"{f}_w"].var() / v if v else 0.0
+            ic = r.group_by("date").agg(pl.corr(f"{f}_w", "y")).select(pl.col(f"{f}_w").mean()).item()
+            parts.append(f"{f} {share:.2f}/{ic:+.3f}")
+        out.append(f"{g} looks like a group code ({train[g].n_unique()} values, constant per asset). Per feature: "
+                   f"share of within-date variance in the date x {g} mean / mean within-date rank corr(y, x minus "
+                   f"its date x {g} mean): " + ", ".join(parts))
+    return out
 
 
 def _y_line(train: pl.DataFrame) -> str:

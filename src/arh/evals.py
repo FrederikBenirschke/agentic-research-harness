@@ -199,6 +199,10 @@ def accuracy(note: dict, truth: dict, code: str = "") -> dict:
            "noise_named": len(feats & set(truth["noise_features"]))}
     if code:
         out["decoy_in_model"] = any(d["feature"] in code for d in truth["decoys"])
+        # named is not used: a note can say "sector" while the model never reads the sector code
+        used = set(FEAT.findall(code.lower()))
+        out["mechanisms_in_model"] = [m["id"] for m in truth["mechanisms"] if m["id"] in hits
+                                      and all(f in used for f in m["features"] if f != "y")]
     if note["kind"] == "forecast" and note.get("holdout") is not None:
         oracle = truth["oracle_holdout_r2"]   # null worlds: the ratio is meaningless, report raw holdout only
         out["holdout_vs_oracle"] = note["holdout"] / oracle if oracle > 1e-3 else None
