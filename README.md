@@ -129,6 +129,13 @@ On exam2 the stated oracle leaves out information in past y, so it is not the
 best feasible forecast. On exam5 the oracle's own holdout R² is low by chance
 (0.026 against 0.038 on the training dates). Neither is a grading error.
 
+On exam3 Haiku scored 0.03 to 0.14 because it never subtracted a
+feature's date × sector mean, although it can build that model when told. One
+extra line in the data summary, a per-group variance decomposition, put that
+feature in 9 of 9 Haiku models on three random worlds it was not built on, and
+it put a decoy group code into none of 6 on two control worlds
+([Section 6](#6-why-haiku-fails-exam3-numbers-in-the-data-summary-beat-an-instruction)).
+
 We also checked that the agents cannot read the holdout, the truth file or
 the generators, by auditing the traces of 472 runs and by instructing an
 analyst to try ([Access](#access-to-the-holdout-and-truth-files)).
@@ -443,6 +450,59 @@ runs in all, and every run is in [results/exam/ledger.jsonl](results/exam/ledger
 
 After this pass the exam worlds are retired to development use; the next pass
 needs a fresh set with new seeds.
+
+### 6. Why Haiku fails exam3: numbers in the data summary beat an instruction
+
+In exam3, `x11` predicts `y` only relative to its sector's mean on the same
+date (the sector code is `x06`), and the effect is scaled by the asset's
+volatility. Opus and Haiku both find the volatility scaling (CV from about
+0.003 to 0.005). Every Opus run then subtracts `x11`'s date × sector mean
+(CV 0.005 to 0.014). No Haiku run does. One Haiku run measured `x11`'s sector
+share by grouping on `x06` alone across all dates. It found 93% of the
+variance within sectors and dropped the idea. Grouped by date and sector, the
+sector part is 71%. Haiku used 32 to 44 of its 60 turns, so the turn limit
+is not the cause.
+
+The mechanism regex credited the sector effect in 10 of the 13 Haiku runs
+that never used it, because their notes say "group" or "demean". We added `mechanisms_in_model`,
+which also requires every feature of the mechanism to appear in the model
+code. On the 23 exam3 forecaster runs it separates the scores exactly: runs
+that use the sector effect score 0.74 to 0.96, the others 0.01 to 0.19.
+
+Haiku on exam3, which is now a dev world, 3 runs per arm:
+
+| arm | sector effect in model | score |
+|---|---|---|
+| exam pass 1 (both arms) | 0/6 | 0.03–0.14 |
+| given the Opus forecast note | 2/3 | 0.19, 0.95, 0.96 |
+| explore3 + one prompt line: split strong features by date × group | 0/3 | 0.05–0.10 |
+| explore3, data summary with a group decomposition | 1/3 | 0.01–0.89 |
+| plancall, data summary with a group decomposition | 2/3 | 0.15–0.89 |
+
+Haiku can build the model when told what it is, and it ignores an instruction
+to look. The group decomposition (`ARH_SUMMARY=groups`) is one extra line in
+the harness's data summary. For each column that is constant per asset with
+few values, it lists every feature's share of within-date variance in its
+date × group mean, and the rank IC of the deviation from that mean. On exam3
+it shows `x11`'s rank IC rise from 0.082 to 0.139. It also shows three noise
+features with large sector shares and no signal.
+
+We built the line after looking at exam3, so we tested it on random dev
+worlds it was not built on (`make_random.py`), with Haiku, `explore3` and
+3 runs per arm:
+
+| world | sector effect in model, default → groups | score, default → groups |
+|---|---|---|
+| r5 (sector only) | 0/3 → 3/3 | 0.45–0.80 → 1.01–1.48 |
+| r10 (sector + scale) | 0/3 → 3/3 | 0.73–0.79 → 0.95–0.98 |
+| r39 (sector + product) | 0/3 → 3/3 | 0.07–0.13 → 0.13–0.74 |
+| r19, r43: a decoy group code, no sector effect | decoy code in model 0/6 → 0/6 | 0.61–0.88 → 0.61–0.93 |
+
+On r5 the oracle's holdout R² is only 0.005, so its ratio is noisy. On a third
+control world, r40, both arms and the ridge baseline score far below zero
+(holdout R² about −0.1), which we have not looked into. Like the plan call,
+this suggests that a computed number reaches Haiku where an instruction does
+not. n=3 per cell, MDE not computed, Haiku only.
 
 ### Access to the holdout and truth files
 
