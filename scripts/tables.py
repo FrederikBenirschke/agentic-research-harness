@@ -131,6 +131,25 @@ def planted3() -> str:
     return "\n".join(out)
 
 
+def exam() -> str:
+    """Sealed exam pass 1: holdout / oracle per run, raw holdout R2 on the null world, – for a failed run."""
+    rows = load(RESULTS / "exam" / "ledger.jsonl")
+    cells = [(m, a) for m in ("claude-haiku-5-5", "claude-opus-5-5") for a in ("explore3", "plancall")]
+    arm = {"explore3": "primer only", "plancall": "plan call"}
+    out = ["| world | " + " | ".join(f"{NAME[m].split()[0]}, {arm[a]}" for m, a in cells) + " |",
+           "|---|" + "---|" * len(cells)]
+    for w in [f"exam{i}" for i in range(1, 7)]:
+        null = w == "exam4"
+        line = []
+        for m, a in cells:
+            rs = [r for r in rows if r["world"].endswith(w) and r["model"] == m and r["prompts"] == a]
+            v = [r.get("holdout" if null else "holdout_vs_oracle") for r in rs]
+            line.append(", ".join("–" if x is None else f"{x:.3f}".replace("-", "−") if null else f"{x:.2f}" for x in v))
+        out.append(f"| {w + ' (null, raw R²)' if null else w} | " + " | ".join(line) + " |")
+    return "\n".join(out)
+
+
 if __name__ == "__main__":
     print("## Tuned prompts on new data\n\n" + ablation() + "\n\n## Forecasters\n\n" + behaviour("forecaster") +
-          "\n\n## Analysts\n\n" + behaviour("analyst") + "\n\n## planted3\n\n" + planted3())
+          "\n\n## Analysts\n\n" + behaviour("analyst") + "\n\n## planted3\n\n" + planted3() +
+          "\n\n## Sealed exam\n\n" + exam())
