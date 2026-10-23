@@ -1,0 +1,14 @@
+{
+ "world": "../worlds/exam/exam5",
+ "conditions": {
+  "analyst-open": {
+   "agent": "analyst",
+   "about": "sealed exam world",
+   "notes": []
+  },
+  "forecaster-open": {
+   "agent": "forecaster",
+   "notes": []
+  }
+ }
+}
