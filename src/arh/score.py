@@ -24,6 +24,8 @@ import polars as pl
 WORKER = Path(__file__).with_name("worker.py")
 CV_FOLDS = 5
 CV_SHARE = 0.5          # the last half of the training dates is tested, in CV_FOLDS blocks
+ONE_THREAD = {v: "1" for v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                               "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS")}  # evals run many fits in parallel
 
 
 class ScoreError(Exception):
@@ -68,7 +70,8 @@ def forecast(model: Path, train: pl.DataFrame, test: pl.DataFrame, timeout_s: fl
     allow = [model.parent, WORKER, *runtime_paths()]
     with tempfile.TemporaryFile() as err:
         proc = subprocess.Popen(["sandbox-exec", "-p", profile(allow), sys.executable, "-I", str(WORKER), str(model)],
-                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, cwd=model.parent)
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, cwd=model.parent,
+                                env={**os.environ, **ONE_THREAD})
         timer = threading.Timer(timeout_s, proc.kill)
         timer.start()
         try:
@@ -110,22 +113,47 @@ def _drive(proc: subprocess.Popen, train: pl.DataFrame, test: pl.DataFrame) -> n
     return out
 
 
-def cv(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> list[float]:
-    """Expanding-window walk-forward R^2 per fold."""
+def rank_metrics(dates: np.ndarray, y: np.ndarray, yhat: np.ndarray) -> dict:
+    """Mean per-date Spearman IC, and the per-date Sharpe of the top-minus-bottom quintile of the forecast
+    (equal weights, not annualised). A date with a constant forecast counts as IC 0 and spread 0."""
+    df = pl.DataFrame({"date": dates, "y": y, "f": yhat}).with_columns(
+        q=(pl.col("f").rank("ordinal").over("date") - 1) / pl.len().over("date"))
+    per = df.group_by("date").agg(
+        ic=pl.corr("f", "y", method="spearman"),
+        ls=pl.col("y").filter(pl.col("q") >= 0.8).mean() - pl.col("y").filter(pl.col("q") < 0.2).mean(),
+        flat=pl.col("f").n_unique() == 1)
+    per = per.with_columns(pl.when(pl.col("flat")).then(0.0).otherwise(pl.col(c)).fill_nan(0.0).fill_null(0.0).alias(c)
+                           for c in ("ic", "ls"))
+    sd = per["ls"].std()
+    return {"ic": float(per["ic"].mean()), "ls_sharpe": float(per["ls"].mean() / sd) if sd else 0.0}
+
+
+def cv_full(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> tuple[list[float], dict]:
+    """Expanding-window walk-forward R^2 per fold, and rank metrics over all CV test dates."""
     train = train.sort("date", "asset")
     dates = train["date"].unique().sort()
     start = int(len(dates) * (1 - CV_SHARE))
     blocks = np.array_split(dates[start:].to_numpy(), CV_FOLDS)
-    scores = []
+    scores, parts = [], []
     for block in blocks:
         fit = train.filter(pl.col("date") < block[0])
         test = train.filter(pl.col("date").is_in(block))
         yhat = forecast(model, fit, test, timeout_s / CV_FOLDS)
         scores.append(r2(test["y"].to_numpy(), yhat))
-    return scores
+        parts.append((test["date"].to_numpy(), test["y"].to_numpy(), yhat))
+    return scores, rank_metrics(*(np.concatenate(p) for p in zip(*parts)))
+
+
+def cv(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> list[float]:
+    return cv_full(model, train, timeout_s)[0]
+
+
+def holdout_full(model: Path, world: Path, timeout_s: float = 600) -> dict:
+    train = pl.read_parquet(world / "public" / "train.parquet").sort("date", "asset")
+    hold = pl.read_parquet(world / "sealed" / "holdout.parquet").sort("date", "asset")
+    y, yhat = hold["y"].to_numpy(), forecast(model, train, hold, timeout_s)
+    return {"r2": r2(y, yhat), **rank_metrics(hold["date"].to_numpy(), y, yhat)}
 
 
 def holdout(model: Path, world: Path, timeout_s: float = 600) -> float:
-    train = pl.read_parquet(world / "public" / "train.parquet").sort("date", "asset")
-    hold = pl.read_parquet(world / "sealed" / "holdout.parquet").sort("date", "asset")
-    return r2(hold["y"].to_numpy(), forecast(model, train, hold, timeout_s))
+    return holdout_full(model, world, timeout_s)["r2"]

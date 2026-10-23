@@ -101,6 +101,8 @@ def main() -> None:
     s.add_argument("--judge", default="claude-opus-5-5", help="claude-* or Ollama model, or 'none'")
     s.add_argument("--max-turns", type=int, default=0, help="0: quick, fewest turns per agent, notes inlined")
     s.add_argument("--prompts", type=Path, help="dir of prompt versions to use instead of agents/")
+    s.add_argument("--timeout", type=float, default=600, help="seconds per agent run")
+    s.add_argument("--budget", type=float, default=2.0, help="USD cap per agent run")
     s.add_argument("--out", type=Path, help="results file (default runs/evals/results.jsonl)")
     s = sub.add_parser("regrade", help="grade recorded eval runs again with the current grader")
     s.add_argument("files", nargs="+", type=Path)
@@ -121,7 +123,7 @@ def main() -> None:
             (RUNS / "evals").mkdir(parents=True, exist_ok=True)
             conds = list(json.loads(a.spec.read_text())["conditions"]) if a.condition == "all" else [a.condition]
             asyncio.run(evals.run_conditions(a.spec, conds, a.model, a.n, None if a.judge == "none" else a.judge,
-                                             a.parallel, RUNS, a.max_turns, prompts=a.prompts, out=a.out))
+                                             a.parallel, RUNS, a.max_turns, a.timeout, a.prompts, a.out, a.budget))
             print(evals.report(a.out or RUNS / "evals" / "results.jsonl"))
         elif a.cmd == "regrade":
             evals.regrade(a.files, None if a.judge == "none" else a.judge, a.out_dir)

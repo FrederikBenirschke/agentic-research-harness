@@ -123,6 +123,7 @@ def run_metrics(root: Path, run: str) -> dict:
     m["numbers_grounded"] = grounded(numbers(note["text"]), sources)
     if note["kind"] == "forecast":
         m["cv"], m["holdout"] = note["cv"], note["holdout"]
+        m["holdout_ic"], m["holdout_ls"] = note.get("holdout_ic"), note.get("holdout_ls")
         m["cv_reported_ok"] = note["cv"] is not None and any(
             abs(float(n.rstrip("%")) - note["cv"]) < 0.002 for n in numbers(note["text"]) if not n.endswith("%"))
     if note["kind"] == "finding" and note["artifact"]:
@@ -199,7 +200,8 @@ def accuracy(note: dict, truth: dict, code: str = "") -> dict:
     if code:
         out["decoy_in_model"] = any(d["feature"] in code for d in truth["decoys"])
     if note["kind"] == "forecast" and note.get("holdout") is not None:
-        out["holdout_vs_oracle"] = note["holdout"] / truth["oracle_holdout_r2"]
+        oracle = truth["oracle_holdout_r2"]   # null worlds: the ratio is meaningless, report raw holdout only
+        out["holdout_vs_oracle"] = note["holdout"] / oracle if oracle > 1e-3 else None
     return out
 
 
@@ -292,7 +294,8 @@ QUICK_TURNS = {"analyst": 2}     # fewest turns that can produce the note: analy
 
 async def run_conditions(spec_path: Path, conditions: list[str], model: str, n: int, judge_model: str | None,
                          parallel: int, runs_dir: Path, max_turns: int = 15, timeout_s: float = 600,
-                         prompts: Path | None = None, out: Path | None = None) -> list[dict]:
+                         prompts: Path | None = None, out: Path | None = None,
+                         max_budget_usd: float = 2.0) -> list[dict]:
     """Run n reps of each condition, at most ``parallel`` at a time, and append each graded run to ``out``.
     All (condition, rep) pairs share one pool because a local Ollama server has about 2.5x the throughput
     when serving several requests at once (requires OLLAMA_NUM_PARALLEL >= parallel)."""
@@ -321,7 +324,7 @@ async def run_conditions(spec_path: Path, conditions: list[str], model: str, n: 
                 task = (f"All notes so far:\n\n{notes}\n\nYou have {turns} turn(s), so do not search. "
                         + ("Run one script, then call add_note." if turns > 1 else "Call add_note now."))
             run = await run_agent(root, cond["agent"], task, model=model, max_turns=turns, timeout_s=timeout_s,
-                                  prompts=prompts)
+                                  max_budget_usd=max_budget_usd, prompts=prompts)
             m = await asyncio.to_thread(grade, root, run, judge_model)
             m.update(condition=condition, mode=mode, world=spec["world"], rep=i, root=str(root), judge_model=judge_model,
                      prompts=label)

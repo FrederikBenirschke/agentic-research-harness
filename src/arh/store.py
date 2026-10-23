@@ -1,6 +1,6 @@
-"""SQLite store shared by all agents. Tables: notes, agent runs, and trials
+"""SQLite store shared by all agents. Tables: notes, agent runs, trials
 (one row per score_model call, so a result can be compared with the number of
-models tried).
+models tried), and requests (tools or libraries an agent wanted but did not have).
 
 Agents access the store only through the tools in arh.tools. No tool returns
 the holdout column.
@@ -26,8 +26,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(text, kind UNINDEXED);
 CREATE TABLE IF NOT EXISTS runs (
     id TEXT PRIMARY KEY, agent TEXT, task TEXT, model TEXT, started TEXT, ended TEXT,
     cost REAL, turns INTEGER, error TEXT);
+CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY, run TEXT, want TEXT, why TEXT, instead TEXT, ts TEXT);
 CREATE TABLE IF NOT EXISTS trials (
-    id INTEGER PRIMARY KEY, run TEXT, artifact_sha TEXT, cv REAL, error TEXT, ts TEXT);
+    id INTEGER PRIMARY KEY, run TEXT, artifact_sha TEXT, cv REAL, error TEXT, ts TEXT, why TEXT);
 """
 
 
@@ -40,6 +42,9 @@ class Store:
         self.path = Path(path)
         with self._db() as db:
             db.executescript(SCHEMA)
+            for table, col in (("trials", "why"), ("notes", "holdout_ic"), ("notes", "holdout_ls")):   # older stores
+                if col not in {r[1] for r in db.execute(f"PRAGMA table_info({table})")}:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {'TEXT' if col == 'why' else 'REAL'}")
 
     def _db(self) -> sqlite3.Connection:
         db = sqlite3.connect(self.path, timeout=30)
@@ -67,9 +72,10 @@ class Store:
             db.execute("INSERT INTO notes_fts (rowid, text, kind) VALUES (?,?,?)", (cur.lastrowid, text, kind))
             return cur.lastrowid
 
-    def set_holdout(self, note_id: int, holdout: float) -> None:
+    def set_holdout(self, note_id: int, holdout: float, ic: float | None = None, ls: float | None = None) -> None:
         with self._db() as db:
-            db.execute("UPDATE notes SET holdout = ? WHERE id = ?", (holdout, note_id))
+            db.execute("UPDATE notes SET holdout = ?, holdout_ic = ?, holdout_ls = ? WHERE id = ?",
+                       (holdout, ic, ls, note_id))
 
     def get(self, note_id: int) -> dict | None:
         with self._db() as db:
@@ -135,11 +141,22 @@ class Store:
         with self._db() as db:
             return [dict(r) for r in db.execute("SELECT * FROM runs ORDER BY started")]
 
-    def add_trial(self, run: str, artifact_sha: str, cv: float | None, error: str | None) -> int:
+    def add_request(self, run: str, want: str, why: str, instead: str) -> int:
         with self._db() as db:
-            db.execute("INSERT INTO trials (run, artifact_sha, cv, error, ts) VALUES (?,?,?,?,?)",
-                       (run, artifact_sha, cv, error, now()))
-            return db.execute("SELECT COUNT(DISTINCT artifact_sha) FROM trials").fetchone()[0]
+            return db.execute("INSERT INTO requests (run, want, why, instead, ts) VALUES (?,?,?,?,?)",
+                              (run, want, why, instead, now())).lastrowid
+
+    def requests(self) -> list[dict]:
+        with self._db() as db:
+            return [dict(r) for r in db.execute("SELECT * FROM requests ORDER BY id")]
+
+    def add_trial(self, run: str, artifact_sha: str, cv: float | None, error: str | None,
+                  why: str | None = None) -> tuple[int, int]:
+        """Returns (trial id, distinct models scored so far)."""
+        with self._db() as db:
+            cur = db.execute("INSERT INTO trials (run, artifact_sha, cv, error, ts, why) VALUES (?,?,?,?,?,?)",
+                             (run, artifact_sha, cv, error, now(), why))
+            return cur.lastrowid, db.execute("SELECT COUNT(DISTINCT artifact_sha) FROM trials").fetchone()[0]
 
 
 def render(note: dict, full: bool = False) -> str:

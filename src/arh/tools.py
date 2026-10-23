@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -90,7 +91,8 @@ def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, w
             return _err(str(e))
         if kind == "forecast":
             try:                                    # stored, not returned to the agent
-                store.set_holdout(note_id, await asyncio.to_thread(score.holdout, work / artifact, world))
+                h = await asyncio.to_thread(score.holdout_full, work / artifact, world)
+                store.set_holdout(note_id, h["r2"], h["ic"], h["ls_sharpe"])
             except score.ScoreError:
                 pass
             return _ok(f"added #{note_id}, cv R2 {cv:.4f}")
@@ -98,19 +100,43 @@ def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, w
 
     @tool("score_model", "Walk-forward CV of a model file (expanding window, 5 folds over the last half of "
           "the training dates). Returns R2 per fold. Every call is counted as a trial.",
-          {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]})
+          {"type": "object", "properties": {
+              "path": {"type": "string"},
+              "relation": {"type": "string", "enum": ["follow-up", "new"],
+                           "description": "follow-up: refines an earlier trial or note; new: a different idea"},
+              "builds_on": {"type": "string", "description": "the trial or note it follows up, or what it differs from"},
+              "why": {"type": "string", "description": "a paragraph of prose: what you saw in the data or in earlier "
+                      "results, the hypothesis this model tests, why this model tests it, and what CV would confirm or "
+                      "refute it"},
+              "learned": {"type": "string", "description": "a paragraph of prose: what the previous trial's result "
+                          "told you about the data, and how that led to this one"}},
+           "required": ["path"]})
     async def score_model(args):
+        why = {k: args[k] for k in ("relation", "builds_on", "why", "learned") if args.get(k)}
+        why = json.dumps(why) if why else None
         try:
             path = resolve(args["path"])
             sha = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
-            folds = await asyncio.to_thread(score.cv, path, pl.read_parquet(train))
+            folds, rank = await asyncio.to_thread(score.cv_full, path, pl.read_parquet(train))
         except (ValueError, score.ScoreError) as e:
-            store.add_trial(run, "", None, str(e)[:500])
+            store.add_trial(run, "", None, str(e)[:500], why)
             return _err(str(e))
-        n = store.add_trial(run, sha, sum(folds) / len(folds), None)
-        return _ok(f"cv R2 mean {sum(folds) / len(folds):.4f}, folds {[round(f, 4) for f in folds]}; "
+        tid, n = store.add_trial(run, sha, sum(folds) / len(folds), None, why)
+        return _ok(f"trial #{tid}: cv R2 mean {sum(folds) / len(folds):.4f}, folds {[round(f, 4) for f in folds]}; "
+                   f"rank IC {rank['ic']:.4f}, top-minus-bottom quintile Sharpe per date {rank['ls_sharpe']:.3f}; "
                    f"{n} distinct models scored in this research run so far")
 
-    tools = [search_notes, get_note, add_note] + ([score_model] if can_score else [])
+    @tool("request", "Record a library, tool or data you wanted for an idea but do not have (there is no network "
+          "and no pip install). The maintainer reviews these. Then carry on with your fallback.",
+          {"type": "object", "properties": {
+              "want": {"type": "string", "description": "what you wanted, e.g. a library and the method in it"},
+              "why": {"type": "string", "description": "the idea it was for and why it should help on this data"},
+              "instead": {"type": "string", "description": "what you will do instead with what is available"}},
+           "required": ["want", "why", "instead"]})
+    async def request(args):
+        rid = store.add_request(run, args["want"], args["why"], args["instead"])
+        return _ok(f"request #{rid} recorded. Go ahead with your fallback: {args['instead']}")
+
+    tools = [search_notes, get_note, add_note] + ([request] if has_files else []) + ([score_model] if can_score else [])
     return (create_sdk_mcp_server(name=SERVER, version="1.0", tools=tools),
             [f"mcp__{SERVER}__{t.name}" for t in tools])
