@@ -60,8 +60,7 @@ in 5 of 5 runs when handed a finding written by an Opus analyst
 benchmarked the full loop end to end.
 
 Every run is graded on four groups of metrics ([src/arh/evals.py](src/arh/evals.py)).
-Analysts and forecasters get all four, except that the forecast metrics need
-a forecast.
+The last group, forecast quality, applies only to forecasters.
 
 **How did it work?** Whether the run finished and filed exactly one note of
 an allowed kind; turns, tool calls, tool error rate, repeated identical calls,
