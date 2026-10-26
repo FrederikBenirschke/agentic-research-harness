@@ -40,26 +40,58 @@ files can be graded against the truth.
 
 ## The evals
 
-- **Known truth.** A generator script builds each dataset (40 assets, 700
-  days, 16 columns, next-day return), plants a few rules and a trap column
-  that only looks useful, writes them to a hidden file, and holds back the
-  last 200 days.
-- **Eval = one agent × fixed starting notes × dataset × prompt version.**
-  `arh eval` runs a cell N times in parallel and grades each run. Prompt
-  versions live side by side in `evals/prompts/`, so an ablation is a grid of
-  model × prompt × dataset.
-- **Graders.** Forecast score against the best possible forecast (the
-  *oracle*, computed from the hidden rules); which hidden rules the agent
-  names and which it actually uses in its model code; whether it fell for
-  the trap; whether the numbers in its note appear in its tool output and the
-  notes it cites were returned to it; whether the analyst's script reproduces
-  its numbers on rerun; an Opus judge rating each note against the truth; and
-  process metrics (turns, tool calls, errors, models tried, cost).
-- **Access audit.** `scripts/audit_access.py` scans every trace for reads of
-  hidden files. Across 472 runs none happened, and an agent told to break in
-  was refused 76 times.
-- **Sealed exam.** Six datasets built by a separate agent, run once with
-  frozen prompts ([protocol](docs/exam.md)).
+A generator script builds each dataset: 40 assets over 700 days, 16 numeric
+columns and the next-day return. It plants a few rules, adds a trap column
+that only looks useful (a noisy copy of a real one), writes both to a hidden
+file, and holds back the last 200 days. One eval is one agent, a fixed set of
+starting notes, one dataset and one prompt version; `arh eval` runs it N times
+in parallel and grades every run. Prompt versions sit side by side in
+`evals/prompts/`, so an ablation is a grid of model × prompt × dataset.
+
+Every run is graded on four groups of metrics ([src/arh/evals.py](src/arh/evals.py)).
+
+**Forecast quality** (forecaster only). The main benchmark number is the
+*score*: the model's R² on the 200 held-back days divided by the R² of the
+best possible forecast, the *oracle*, which computes the expected return from
+the hidden rules. 1.0 means the agent matched the oracle, 0 means it did no
+better than predicting the average. Dividing by the oracle makes datasets with
+weak and strong signal comparable. We also record the daily rank correlation
+between forecast and return, and the Sharpe ratio of a long-short portfolio
+built from the forecast. On datasets with no signal at all, the raw R² is
+reported, since there is nothing to divide by.
+
+**Did it find the truth?** For each hidden rule, whether the agent's note
+names it (all the rule's columns plus a pattern for its form, so naming `x04`
+alone does not count as finding a U-shape in `x04`), and whether its model
+code actually uses those columns. A note can say "sector" while the model
+never reads the sector column, so the second check is the one we report.
+Also: whether the trap column is an input to the model (comments do not
+count), and how many pure-noise columns the note mentions.
+
+**Is the note backed by work it did?** The share of numbers in the note that
+appear in the agent's own tool output; whether the notes it cites were
+actually returned to it by a tool; whether a forecaster reports the CV score
+the harness measured; and for an analyst, whether its script, rerun in the
+sandbox, prints the numbers in its note. An Opus judge also rates each note
+1 to 5 for specificity, evidence, actionability and clarity, and, given the
+hidden rules, as correct, partial or wrong.
+
+**How did it work?** Whether the run finished and filed exactly one note of
+an allowed kind; turns, tool calls, tool error rate, repeated identical calls,
+whether it read notes before writing, models scored before filing, output
+tokens, wall time and cost. Pattern checks over its code record which
+analyses it ran (regime split, lags, nonlinearity, cross-asset, multiple
+testing).
+
+Each setting runs 3 to 10 times. Tables give the mean ± the standard
+deviation over runs, and comparisons between settings give a 95% interval
+from a bootstrap over runs and blocks of held-back days.
+
+Two checks guard the benchmark itself. `scripts/audit_access.py` scans every
+trace for reads of hidden files: across 472 runs none happened, and an agent
+told to break in was refused 76 times. And a sealed exam, six datasets built
+by a separate agent and run once with frozen prompts
+([protocol](docs/exam.md)), is the only test the prompts were not tuned on.
 
 ## What we learned
 
