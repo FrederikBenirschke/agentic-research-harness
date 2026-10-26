@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import random
 import shutil
 import os
 import signal
@@ -35,19 +34,21 @@ def init(name: str, world: Path) -> Path:
     return root
 
 
-async def loop(root: Path, mix: dict[str, int], rounds: int, parallel: int, model: str | None) -> None:
+async def loop(root: Path, mix: dict[str, int], rounds: int, parallel: int, model: str | None,
+               max_turns: int = 40, models: dict[str, str] | None = None) -> None:
+    """Each round runs the roles in mix order, one stage per role, so a forecaster reads what this
+    round's analysts and ideators wrote. Copies of one role run in parallel."""
     gate = asyncio.Semaphore(parallel)
 
     async def one(agent: str) -> None:
         async with gate:
-            run = await run_agent(root, agent, model=model)
+            run = await run_agent(root, agent, model=(models or {}).get(agent, model), max_turns=max_turns)
             print(f"done {run}", flush=True)
 
     for r in range(rounds):
-        batch = [a for a, n in mix.items() for _ in range(n)]
-        random.shuffle(batch)
-        print(f"round {r + 1}/{rounds}: {batch}", flush=True)
-        await asyncio.gather(*(one(a) for a in batch))
+        for agent, n in mix.items():
+            print(f"round {r + 1}/{rounds}: {n} x {agent}", flush=True)
+            await asyncio.gather(*(one(agent) for _ in range(n)))
 
 
 def status(root: Path) -> None:
@@ -87,6 +88,8 @@ def main() -> None:
     sub.choices["loop"].add_argument("--mix", default="analyst:1,ideator:1,forecaster:1")
     sub.choices["loop"].add_argument("--rounds", type=int, default=1)
     sub.choices["loop"].add_argument("--parallel", type=int, default=3)
+    sub.choices["loop"].add_argument("--max-turns", type=int, default=40)
+    sub.choices["loop"].add_argument("--models", default="", help="per-role models, e.g. analyst:claude-sonnet-5-5")
     sub.choices["notes"].add_argument("--kind")
     sub.choices["notes"].add_argument("--query", default="")
     s = sub.add_parser("metrics", help="process and grounding metrics for every agent run of a research run")
@@ -142,7 +145,8 @@ def main() -> None:
         print(asyncio.run(run_agent(root, a.agent, a.task, a.model)))
     elif a.cmd == "loop":
         mix = {k: int(v) for k, v in (x.split(":") for x in a.mix.split(","))}
-        asyncio.run(loop(root, mix, a.rounds, a.parallel, a.model))
+        models = dict(x.split(":", 1) for x in a.models.split(",") if x)
+        asyncio.run(loop(root, mix, a.rounds, a.parallel, a.model, a.max_turns, models))
     elif a.cmd == "status":
         status(root)
     elif a.cmd == "notes":
