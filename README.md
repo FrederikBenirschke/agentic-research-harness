@@ -80,9 +80,7 @@ moved it. What worked was changing the structure around the model. The
 runner now asks for the model's own checklist in a separate call that never
 sees the reference list, and puts that checklist at the top of the agent's
 prompt. Agents went from running PCA or grouping assets in 1 of 30 runs to 17
-of 18. Whether that gives better forecasts is not settled: on the one dataset
-where it should matter there are only 3 runs per setting
-([details](docs/results.md#2-the-reference-list-makes-the-model-forget-what-it-knows)).
+of 18 ([details](docs/results.md#2-the-reference-list-makes-the-model-forget-what-it-knows)).
 
 The same held for a single instruction. Haiku failed one exam dataset because
 it never compared a column with its sector's average on the same day, and a
