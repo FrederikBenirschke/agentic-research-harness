@@ -1,57 +1,60 @@
 # agentic-research-harness
 
-A test bench for LLM research agents, built on the Claude Agent SDK. Each test
-is a synthetic dataset of asset returns with a few hidden patterns. Because we
-know the answer, we can check what an agent claims to find and how good its
-forecast is. The yardstick is the best possible forecast, the one that knows
-the hidden patterns: a score of 1.0 means the agent matched it.
+This project tests whether LLM agents can do quantitative research: given a
+table of data, can they find the patterns in it and build a forecast? To check
+their answers we need to know the truth, so the code makes the data itself.
 
-What we found:
+## What the code does
 
-- On six test datasets built by a separate agent and never looked at before
-  the run, Opus came within 8% of the best possible forecast on every dataset
-  that had a pattern to find. On the one with no pattern, no model fooled
-  itself into finding one.
-- A cheat sheet of research methods made the model forget methods it already
-  knew. Asked to plan, Haiku included PCA in 5 of 5 plans without the sheet
-  and in 0 of 5 with it. Having the model write its own plan before it sees
-  the sheet brings these methods back into the code it runs (PCA in 17 of 18
-  runs, against 1 of 30).
+1. **Makes a dataset with hidden rules.** A Python script generates a table
+   of 40 assets over 700 days. Each row has 16 numeric columns (`x00` to
+   `x15`) and the asset's next-day return (`y`). The script builds `y` from a
+   few rules it writes down in a hidden file, for example "`x07` raises
+   tomorrow's return, but only on days when `x11` is positive". It also adds a
+   trap: a column that looks useful but only because it is a noisy copy of a
+   real one. The rest of the columns are noise. The last 200 days are held
+   back for scoring. Each generated dataset has a name (`planted1`, `exam3`,
+   `r55`, ...), and we call one a *world*.
+2. **Lets agents work on it.** Claude agents (built on the Claude Agent SDK)
+   get the first 500 days and a shell where they can run Python. The
+   *analyst* explores the data and writes up what it found. The *forecaster*
+   reads those notes and writes a forecasting model as a Python file. The
+   agents pass notes to each other through a small database. Each agent's
+   instructions are one Markdown file, and we keep different versions of
+   these instructions side by side to compare them.
+3. **Keeps the answers out of reach.** The shell runs in a sandbox that
+   cannot see the held-back days, the hidden rules or the generator script,
+   and has no internet.
+4. **Scores the forecast.** The code runs the agent's model on the held-back
+   days, one day at a time so it cannot look ahead, and compares it with the
+   best possible forecast: the one computed from the hidden rules (the
+   *oracle*). A score of 1.0 means the agent did as well as the oracle, 0
+   means no better than guessing the average. The code also checks which of
+   the hidden rules the agent mentions and actually uses in its model,
+   whether it fell for the trap, and whether the numbers in its notes come
+   from code it really ran.
+
+We ran Haiku, Sonnet, Opus and Fable, and one open model (gpt-oss) served
+locally, usually 3 to 10 times per setting. In the tables, ± is the standard
+deviation over runs, or over datasets where stated.
+
+## What we found
+
+- On six datasets built by a separate agent and never looked at before the
+  run, Opus came within 8% of the oracle on every dataset that had a pattern
+  to find. On the one with no pattern, no model fooled itself into finding
+  one.
+- A cheat sheet of research methods in the instructions made the model forget
+  methods it already knew. Asked to plan, Haiku included PCA in 5 of 5 plans
+  without the sheet and in 0 of 5 with it. Having the model write its own
+  plan before it sees the sheet brings these methods back into the code it
+  runs (PCA in 17 of 18 runs, against 1 of 30).
 - Haiku ignores instructions but reacts to numbers. Telling it to check
-  whether a feature works within each sector changed nothing. Printing the
+  whether a column works within each sector changed nothing. Printing the
   result of that check in the data summary it reads at the start improved its
   forecasts on 6 of 8 new datasets.
 - The agents cannot peek at the answers. We checked the logs of all 472 runs
   and told one agent to try to break in; every attempt was blocked.
-
-## Setup
-
-A world is a panel of 40 assets × 500 dates with 16 features. The task is to
-forecast next-period `y`. Each world plants a few mechanisms (e.g. a feature
-that matters only when another is positive) and a decoy correlated with `y`
-only through a planted one. The generator writes a sealed truth file and
-holdout that the agents cannot read.
-
-Three agents share a SQLite note store (full-text search, exposed over MCP,
-tools scoped per agent): the **analyst** studies the data and writes findings,
-the **ideator** proposes mechanisms without raw data, and the **forecaster**
-files a model. Analyst and forecaster run Python through Bash in the Claude
-Code OS sandbox (no network, no reads outside their work dir). The harness
-scores a forecast in a separate worker that receives one date at a time, shows
-the agent walk-forward CV on training data, and stores the holdout score
-without returning it. Local models (gpt-oss) run through Ollama's
-Anthropic-compatible API with the same tools.
-
-Each agent is one Markdown prompt; prompt versions live in
-`evals/prompts/<arm>/`. An eval is one agent × a fixed set of starting notes ×
-a world, so an ablation is a grid of model × prompt × world.
-
-**Score** = forecaster holdout R² / oracle holdout R², where the oracle is the
-true conditional mean (1.00 = as good as the truth). Graders also record which
-mechanisms appear in the note and in the model code, whether the decoy is a
-model input, whether the note's numbers appear in the agent's tool output, and
-an Opus judge's correct/partial/wrong rating against the truth. In the tables,
-± is the standard deviation over runs, or over worlds where stated.
 
 ## What was tuned on what
 
