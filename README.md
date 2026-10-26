@@ -63,88 +63,92 @@ deviation over runs, or over datasets where stated.
 - The agents cannot peek at the answers. We checked the logs of all 472 runs
   and told one agent to try to break in; every attempt was blocked.
 
-## What was tuned on what
+## Which results are a fair test
 
-Some arms were built after looking at the world they were then scored on.
-This decides how much each result says:
+Some changes to the instructions were written after we had looked at the
+dataset they were then tested on. That limits what the result can show:
 
-| result | built on | tested on | what it shows |
+| change | written while looking at | tested on | what the result shows |
 |---|---|---|---|
-| tuned prompt (Section 1) | planted1 | planted1b: same mechanisms, new seed | nothing about discovery: the prompt names the mechanisms |
-| group decomposition (Section 5) | exam3, after the exam | fresh random worlds, same kind of sector effect | a generic diagnostic transfers within that mechanism family |
-| plan call (Section 3) | planted8 | planted8c, sealed exam | first result, n=3 |
-| sealed exam (Section 4) | nothing: frozen prompts, worlds built blind | | the clean test |
+| improved instructions (Section 1) | `planted1` | `planted1b`, same hidden rules | only that models follow instructions |
+| extra numbers in the data summary (Section 5) | `exam3`, after the exam | new random datasets with the same kind of sector rule | that it carries over to new datasets of that kind |
+| separate planning call (Section 3) | `planted8` | a variant of `planted8`, the exam | that agents then run the checks; too few runs to judge scores |
+| sealed exam (Section 4) | nothing: instructions frozen, datasets built by someone else | | a fair test |
 
-An earlier arm (`evals/prompts/move`) told the analyst to regress its strongest
-feature "on the other features and their squares". That names the planted form
-in planted3 (`y` depends on `x04²`), so its hits are leakage, and we no longer
-report them.
+One earlier version told the analyst to check whether its strongest column is
+explained by "the other features and their squares". `planted3`'s hidden rule
+is a square, so that line gave away the answer. We dropped those results.
 
 ## Results
 
-### 1. A prompt that names the mechanism helps only on that mechanism
+### 1. Telling the agent what to look for
 
-The tuned prompt (`cur`) adds two checks to the original (`v1`): split an
-effect by a date-level regime, and fit `y` on both features of a correlated
-pair. These are planted1's two mechanisms (the `x07` gate on `x11`, and the
-decoy `x05`, a noisy copy of `x03`), so the prompt describes the answer. On
-planted1b (same mechanisms, new seed) it adds 0.11 to 0.15 of the oracle for
-Haiku, Sonnet and Opus. That is instruction following, not discovery.
+Our first improved instructions added two checks: see whether a column
+predicts returns only on some days (for example when another column is
+positive), and when two columns are correlated, fit both and see which one
+still matters. These are exactly the two rules hidden in `planted1`, the
+dataset we wrote them on: `x07` matters only when `x11` is positive, and `x05`
+is a noisy copy of `x03`. On a second dataset with the same rules and
+different random numbers (`planted1b`), the new instructions raised the score
+by 0.11 to 0.15 for Haiku, Sonnet and Opus. This shows the models follow
+instructions. It does not show they discover anything.
 
-On planted3, whose mechanisms it does not describe (a U-shape in `x04` with
-near-zero linear correlation, a two-period lag, a cross-asset lead), the tuned
-Haiku, Sonnet and Opus analysts missed the U-shape in 15 of 15 runs, and their
-forecasters used the decoy `x12 = x04² + noise` in 15 of 15. A generic EDA
-instruction ("correlation ≈ 0 is not no effect: check deciles, lags > 1,
-other assets") raised lag-2 hits from 1/5 to 3/5 and found no U-shape. A
-forecaster given a note naming all three mechanisms scores 1.00, so the gap is
-in discovery, not modelling. gpt-oss fits a linear model on all 16 features,
-and none of the numbers in its notes appear in its tool output.
+To test discovery we made `planted3`, whose rules the instructions do not
+describe. The main rule is a U-shape: `y` rises with `x04` squared, so large
+values of `x04` in either direction mean higher returns, and a plain
+correlation between `x04` and `y` is close to zero. The trap column `x12` is
+`x04` squared plus noise. Haiku, Sonnet and Opus missed the U-shape in all 15
+runs, and their models used the trap column in all 15. Adding a general hint
+("a correlation near zero does not mean no effect: look at averages by
+decile, longer lags, other assets") did not help them find it. When we gave a
+forecaster a note that names all three rules, it matched the oracle, so the
+models can build the right model; they just do not find the rules.
 
-### 2. The primer pushes out what the model knows
+### 2. The reference list makes the model forget what it knows
 
-Later prompts (`explore3`) append a reference primer on quant research
-practice. To see what it does to the model's own ideas, we asked the model,
-with no tools or data, to list the checks it would run on a returns panel
-(5 plans per setting):
+Later versions of the instructions end with a reference list of research
+practice: how the score works, fat tails, removing the average return of each
+day, columns that stand in for other columns, effects that depend on the
+state of the market, testing many ideas at once. We wanted to know whether
+this list adds to what the model would check on its own, or replaces it.
 
-| model | primer | plans with PCA | plans with industries |
+So we sent the model one message, with no data and no tools: the dataset's
+description and a request to list the structures it would check for in a
+panel of asset returns, with a concrete check for each. We asked 5 times per setting and counted
+the answers that mention PCA and the ones that mention grouping assets into
+industries.
+
+| model | reference list in the message | answers with PCA | answers with industries |
 |---|---|---|---|
-| Haiku 5.5 | none | 5/5 | 5/5 |
-| Haiku 5.5 | in system prompt, or before/after the question | 0/5 | 0–2/5 |
-| Haiku 5.5 | "write your own list first" in the same answer | 2/5 | 1/5 |
-| Haiku 5.5 | primer framed as additive | 1/5 | 1/5 |
+| Haiku 5.5 | no | 5/5 | 5/5 |
+| Haiku 5.5 | yes, in any position | 0/5 | 0–2/5 |
+| Haiku 5.5 | yes, and asked to write its own list first | 2/5 | 1/5 |
+| Haiku 5.5 | yes, introduced as "in addition to what you know" | 1/5 | 1/5 |
 | Opus 5.5 | any of the above | 5/5 | 5/5 |
 
-Haiku's plans stay at 15 to 17 items either way, so the primer's items replace
-its own. This resembles part-list cueing in human memory and the finding that
-models follow context over what they know (Xie et al. 2023).
+Haiku's answers have 15 to 17 items with or without the list, so the list's
+items take the place of its own instead of adding to them. Opus keeps its own
+items in the answer, but when it then works on real data it does not act on
+them: on `planted8`, a dataset where returns are driven by two common factors
+and industry groups, none of 6 Opus runs did PCA.
 
-Opus keeps the items in the plan but does not run them. planted8
-(`worlds/make_planted7.py`) pays only for the full chain: divide out each
-asset's volatility, remove two latent factors, cluster residual correlations
-into industries, model the residual. In 6 Opus runs, none did PCA.
+### 3. Letting the model plan before it reads the list
 
-### 3. A separate plan call
+The fix is to ask for the model's plan before the list is in front of it.
+Before the agent starts, the code makes one extra call to the same model. That
+call gets only the dataset's description and the question above, with no
+reference list, and the model answers with its own checklist. The agent then
+starts as usual, with its normal instructions and the reference list, but the
+checklist is placed at the top with the instruction to run every check on it
+and report which ones showed something.
 
-The fix moves the plan out of the primer's context. A separate call with no
-primer writes the model's own plan (`plan:` in the prompt frontmatter), and
-the agent then runs with that plan on top of its prompt. On planted8, runs
-whose code computes an eigendecomposition or clusters assets rose from 1/30
-without the plan call to 17/18 with it. Scores stayed low (≤ 0.21) because
-planted8's industry eigenvalues sit at the Marchenko–Pastur noise edge.
-planted8c raises the industry factor above the edge:
-
-| model | arm | PCA / clustering runs | score |
-|---|---|---|---|
-| Opus 5.5 | primer only | 2/3 / 0/3 | −0.08, 0.01, 0.00 |
-| Opus 5.5 | plan call | 3/3 / 3/3 | 0.67, 0.15, 0.24 |
-| Haiku 5.5 | primer only | 0/3 / 0/3 | −0.84, −0.09, −0.06 |
-| Haiku 5.5 | plan call | 2/3 / 1/3 | −0.18, −0.12, −0.12 |
-
-n=3 per cell. On the exam worlds (no factor structure) the plan call neither
-helps nor hurts (Haiku, n=10: within ±0.15 on every world, sign mixed), but it
-has a collapse mode: 3 of 10 Haiku runs on exam6 scored about 0.1.
+On `planted8`, Opus and Haiku runs whose code actually computed PCA or
+grouped the assets went from 1 of 30 without the extra call to 17 of 18 with
+it. Whether this also gives better forecasts we cannot say yet. On `planted8`
+the scores stayed near zero either way, and on a variant with stronger
+industry groups we have only 3 runs per setting, too few to tell. On the exam
+datasets, which have no common factors, 10 Haiku runs per setting showed no
+difference in score either way.
 
 ### 4. Sealed exam
 
