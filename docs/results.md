@@ -131,7 +131,7 @@ run computed that difference; no Haiku run did. One Haiku run checked the idea
 the wrong way, by grouping on sector across all days instead of per day, saw
 that the sector explained little, and dropped it. Haiku did not run out of
 turns (it used 32 to 44 of 60). Given the note an Opus run wrote, Haiku built
-the right model in 7 of 7 runs, so it can do it when told what to do. Adding a
+the right model in 9 of 10 runs, so it can do it when told what to do. Adding a
 line to its instructions telling it to check features within each sector and
 day changed nothing (0 of 3 runs).
 
@@ -170,6 +170,77 @@ It helps where there is a sector rule and costs a little where there is none,
 because Haiku then sometimes builds on a group that predicts nothing. The test
 datasets have the same kind of sector rule as `exam3`, so this does not show
 the idea works for other kinds of rule.
+
+## 6. How each model uses its tools
+
+Process metrics from the runs in section 1, pooled over `planted1b` and
+`planted2` (10 runs per row, 6 for gpt-oss), as means per run. "Note numbers
+found in tool output" is the share of numbers in the agent's note that appear
+in output from code it ran. "Judge: correct" is the share of notes the Opus
+judge rated correct against the hidden rules. "Models scored" is how many
+models a forecaster cross-validated before filing one.
+
+Forecasters:
+
+| model | prompt | runs | turns | shell calls | tool error rate | seconds | output tokens | note numbers found in tool output | judge: correct | models scored |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gpt-oss (local) | original | 6 | 3.8 | 0.0 | 0.00 | 290 | 682 | 0.00 | 0.00 | 0.0 |
+| gpt-oss (local) | tuned | 6 | 5.0 | 0.3 | 0.15 | 240 | 899 | 0.00 | 0.00 | 0.2 |
+| Haiku 5.5 | original | 10 | 7.8 | 1.0 | 0.00 | 35 | 1971 | 0.70 | 0.30 | 1.0 |
+| Haiku 5.5 | tuned | 10 | 9.6 | 2.5 | 0.03 | 42 | 2933 | 0.90 | 0.70 | 1.1 |
+| Sonnet 5.5 | original | 10 | 5.0 | 1.0 | 0.00 | 37 | 1030 | 0.97 | 0.30 | 1.0 |
+| Sonnet 5.5 | tuned | 10 | 7.0 | 3.0 | 0.17 | 32 | 1675 | 0.99 | 0.80 | 1.0 |
+| Opus 5.5 | original | 10 | 8.6 | 3.5 | 0.10 | 61 | 3132 | 0.94 | 0.40 | 1.0 |
+| Opus 5.5 | tuned | 10 | 8.7 | 3.7 | 0.07 | 57 | 2912 | 0.97 | 0.90 | 1.0 |
+| Fable 5.1 | original | 10 | 10.6 | 4.2 | 0.02 | 155 | 7213 | 0.98 | 0.60 | 1.0 |
+| Fable 5.1 | tuned | 10 | 9.4 | 3.1 | 0.02 | 87 | 4985 | 0.95 | 0.60 | 1.3 |
+
+Analysts:
+
+| model | prompt | runs | turns | shell calls | tool error rate | seconds | output tokens | note numbers found in tool output | judge: correct | script reproduces note |
+|---|---|---|---|---|---|---|---|---|---|---|
+| gpt-oss (local) | original | 6 | 9.8 | 6.2 | 0.33 | 356 | 1758 | 0.67 | 0.75 | 3/6 |
+| gpt-oss (local) | tuned | 6 | 10.2 | 5.0 | 0.52 | 305 | 2101 | 0.17 | 0.33 | 2/6 |
+| Haiku 5.5 | original | 10 | 8.2 | 3.8 | 0.09 | 70 | 4033 | 0.98 | 0.90 | 10/10 |
+| Haiku 5.5 | tuned | 10 | 8.8 | 4.3 | 0.15 | 41 | 4675 | 0.99 | 0.80 | 8/10 |
+| Sonnet 5.5 | original | 10 | 5.6 | 1.6 | 0.04 | 31 | 2297 | 0.97 | 0.70 | 9/10 |
+| Sonnet 5.5 | tuned | 10 | 6.0 | 2.0 | 0.06 | 30 | 2567 | 0.97 | 0.70 | 10/10 |
+| Opus 5.5 | original | 10 | 6.2 | 2.1 | 0.03 | 42 | 3512 | 0.98 | 1.00 | 10/10 |
+| Opus 5.5 | tuned | 10 | 6.0 | 2.0 | 0.07 | 35 | 2919 | 0.95 | 1.00 | 10/10 |
+| Fable 5.1 | original | 10 | 7.2 | 3.2 | 0.03 | 86 | 5820 | 0.96 | 1.00 | 10/10 |
+| Fable 5.1 | tuned | 10 | 7.5 | 3.4 | 0.15 | 73 | 4908 | 0.98 | 1.00 | 10/10 |
+
+The Claude forecasters score 1.0 to 1.3 models per run, so they mostly file
+the first model they build; the gain from the improved prompt is not a wider
+search. With it, Haiku and Sonnet forecasters run more code (2.5 and 3.0
+shell calls against 1.0) and more of their notes are judged correct. For the
+Claude analysts, 95 to 99% of the numbers in a note come from their own tool
+output, and their scripts reproduce the note in 8 to 10 of 10 reruns. Fable
+writes the most and costs about 3.5 times as much as Opus, without a better
+score. gpt-oss barely uses the shell as a forecaster (0 to 0.3 calls), and
+none of the numbers in its forecaster notes appear in any tool output.
+
+## 7. Handing notes between agents
+
+The evals test one agent at a time. Teamwork is tested by giving one agent's
+note to another as its starting note, so the handoff is fixed and repeatable.
+A Haiku forecaster on `planted1b`:
+
+| starting note | score, 5 runs |
+|---|---|
+| none, works from the data | 0.81 ± 0.00 |
+| a finding written by a Haiku analyst | 0.74, 0.95, 0.74, 0.74, 0.95 |
+| a finding written by an Opus analyst | 0.95 in all 5 |
+
+On `exam3`, a Haiku forecaster given the note an Opus forecaster wrote scored
+0.93 to 0.96 in 9 of 10 runs, against 0.18 ± 0.20 on its own (section 5). On
+`planted3`, a forecaster given a note naming all three hidden rules matched
+the oracle. So a cheap forecaster does nearly as well as an expensive one when
+a stronger agent did the research, and much of the gap between models is in
+what the analyst finds.
+
+The full loop (`arh loop`) runs analysts, ideators and forecasters in rounds
+over one shared store. We have not benchmarked it end to end.
 
 ## Can the agents see the answers?
 

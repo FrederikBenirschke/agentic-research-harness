@@ -48,25 +48,28 @@ starting notes, one dataset and one prompt version; `arh eval` runs it N times
 in parallel and grades every run. Prompt versions sit side by side in
 `evals/prompts/`, so an ablation is a grid of model × prompt × dataset.
 
+**How the agents work together, and how that is tested.** In a full
+research run (`arh loop`) analysts, ideators and forecasters take turns over
+one shared note store: analysts post findings, the ideator posts ideas and
+questions built on them, and the forecaster reads everything and files a
+model. To benchmark this, an eval runs one agent at a time and fixes what the
+others would have written as its starting notes. That makes a handoff
+repeatable: the same Haiku forecaster scores 0.81 from the data alone and 0.95
+in 5 of 5 runs when handed a finding written by an Opus analyst
+([section 7](docs/results.md#7-handing-notes-between-agents)). We have not
+benchmarked the full loop end to end.
+
 Every run is graded on four groups of metrics ([src/arh/evals.py](src/arh/evals.py)).
+Analysts and forecasters get all four, except that the forecast metrics need
+a forecast.
 
-**Forecast quality** (forecaster only). The main benchmark number is the
-*score*: the model's R² on the 200 held-back days divided by the R² of the
-best possible forecast, the *oracle*, which computes the expected return from
-the hidden rules. 1.0 means the agent matched the oracle, 0 means it did no
-better than predicting the average. Dividing by the oracle makes datasets with
-weak and strong signal comparable. We also record the daily rank correlation
-between forecast and return, and the Sharpe ratio of a long-short portfolio
-built from the forecast. On datasets with no signal at all, the raw R² is
-reported, since there is nothing to divide by.
-
-**Did it find the truth?** For each hidden rule, whether the agent's note
-names it (all the rule's columns plus a pattern for its form, so naming `x04`
-alone does not count as finding a U-shape in `x04`), and whether its model
-code actually uses those columns. A note can say "sector" while the model
-never reads the sector column, so the second check is the one we report.
-Also: whether the trap column is an input to the model (comments do not
-count), and how many pure-noise columns the note mentions.
+**How did it work?** Whether the run finished and filed exactly one note of
+an allowed kind; turns, tool calls, tool error rate, repeated identical calls,
+whether it read notes before writing, models scored before filing, output
+tokens, wall time and cost. Pattern checks over its code record which
+analyses it ran (regime split, lags, nonlinearity, cross-asset, multiple
+testing). Per-model tables are in
+[section 6](docs/results.md#6-how-each-model-uses-its-tools).
 
 **Is the note backed by work it did?** The share of numbers in the note that
 appear in the agent's own tool output; whether the notes it cites were
@@ -76,12 +79,25 @@ sandbox, prints the numbers in its note. An Opus judge also rates each note
 1 to 5 for specificity, evidence, actionability and clarity, and, given the
 hidden rules, as correct, partial or wrong.
 
-**How did it work?** Whether the run finished and filed exactly one note of
-an allowed kind; turns, tool calls, tool error rate, repeated identical calls,
-whether it read notes before writing, models scored before filing, output
-tokens, wall time and cost. Pattern checks over its code record which
-analyses it ran (regime split, lags, nonlinearity, cross-asset, multiple
-testing).
+**Did it find the truth?** For each hidden rule, whether the agent's note
+names it (all the rule's columns plus a pattern for its form, so naming `x04`
+alone does not count as finding a U-shape in `x04`), and for a forecaster
+whether its model code actually uses those columns. A note can say "sector"
+while the model never reads the sector column, so the second check is the
+one we report. Also: whether the trap column is an input to the model
+(comments do not count), and how many pure-noise columns the note mentions.
+
+**Forecast quality.** The main benchmark number is the *score*: the
+forecaster's R² on the 200 held-back days divided by the R² of the best
+possible forecast, the *oracle*, which computes the expected return from the
+hidden rules. 1.0 means the agent matched the oracle, 0 means it did no better
+than predicting the average. Dividing by the oracle makes datasets with weak
+and strong signal comparable. Since the forecaster builds on the notes it is
+given, this score measures the analyst's work too when an analyst's finding
+is the starting note. We also record the daily rank correlation between
+forecast and return and the Sharpe ratio of a long-short portfolio built from
+the forecast. On datasets with no signal, the raw R² is reported, since there
+is nothing to divide by.
 
 Each setting runs 3 to 10 times. Tables give the mean ± the standard
 deviation over runs, and comparisons between settings give a 95% interval
