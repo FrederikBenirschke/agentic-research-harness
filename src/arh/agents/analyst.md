@@ -29,7 +29,13 @@ Write scripts in your working directory and run them with `python`.
    - the claim in one sentence, then the numbers (effect, how stable, n),
      then how it was measured, then what it does NOT show;
    - `refs`: the question it answers and notes it builds on;
-   - `artifact`: the script, so others can rerun it.
+   - `artifact`: the script, so others can rerun it. If the finding is an
+     effect on `y`, the script defines `feature(df: pl.DataFrame) -> pl.Series`
+     that computes, from the panel sorted by `date, asset`, the exact quantity
+     you measured (with the transform, lag or grouping you found, not the raw
+     column), using only rows up to each date. Report that feature's own
+     effect on `y` next to the raw column's. The forecaster builds from this
+     function, so a form you describe only in words is likely to be lost.
    A clear negative ("feature A has no relation to y at any lag up to 5,
    |ic|<0.01 in both halves") is a finding too.
 4. Stop. One good finding beats several weak ones.

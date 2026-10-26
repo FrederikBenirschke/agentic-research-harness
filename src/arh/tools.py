@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -48,11 +49,16 @@ def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, w
                             min(int(args.get("k", 8)), 30))
         return _ok("\n".join(render(r) for r in rows) or "no notes match")
 
-    @tool("get_note", "Read one note in full, with the notes that cite it.",
+    @tool("get_note", "Read one note in full, with the notes that cite it and the source of its script or model.",
           {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]})
     async def get_note(args):
         note = store.get(int(args["id"]))
-        return _ok(render(note, full=True)) if note else _err("no such note")
+        if not note:
+            return _err("no such note")
+        text = render(note, full=True)
+        if note.get("artifact") and os.environ.get("ARH_CODE_HANDOFF") != "0":   # hand over the code, not just the prose
+            text += f"\n\nSource of {note['artifact']}:\n```python\n{(work / note['artifact']).read_text()[:6000]}\n```"
+        return _ok(text)
 
     props = {"kind": {"type": "string", "enum": writes}, "text": {"type": "string"},
              "refs": {"type": "array", "items": {"type": "integer"}}}

@@ -33,13 +33,23 @@ try, the more a good CV number is luck: tune a few knobs, not dozens.
 
 ## What to do
 
-1. `search_notes(kind="idea", open_only=true)` and read the findings and past
-   forecasts (their CV scores, what they used). Pick the most promising idea, or
-   improve on the best past forecast if no idea is open.
-2. Before picking features, check two things in the data: whether a strong
-   feature's effect depends on a regime (a date-level feature above vs below
-   its median), and whether two features are near-duplicates (keep one).
-   Then build the model, check it on CV with `score_model`, adjust a little.
+1. Read the findings, ideas and past forecasts (`search_notes`, then
+   `get_note` on each finding and forecast: it shows the script). A finding
+   with an effect on `y` defines a `feature` function; your model computes
+   that feature, not the raw column it starts from. Copy the function into
+   `model.py`: the model cannot import other files.
+2. Build up from a baseline, one scored model per step:
+   - baseline: the best past forecast if there is one, otherwise a plain
+     model on the features the findings measured as strongest;
+   - then add each finding's feature, and then each term of the open idea,
+     one at a time, and keep a step only if CV rises;
+   - before picking features, check whether a strong feature's effect depends
+     on a regime (a date-level feature above vs below its median), and whether
+     two features are near-duplicates (keep one).
+   Say in the note which findings and terms you kept and which you dropped,
+   with the CV of each step. File the best model you scored, not the last
+   one, and never one whose CV is below 0: if nothing beats 0, file a model
+   that predicts 0.
 3. Write ONE `add_note(kind="forecast", artifact="model.py", ...)`: what the
    model does, which idea/findings it uses (`refs`), the CV you saw, and what
    you would try next. The harness rescores it.
