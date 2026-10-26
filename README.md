@@ -1,21 +1,28 @@
 # agentic-research-harness
 
-LLM agents (Claude Agent SDK) look for planted mechanisms in synthetic panels
-with a known truth, so every claim and forecast is graded against the answer.
+A test bench for LLM research agents, built on the Claude Agent SDK. Each test
+is a synthetic dataset of asset returns with a few hidden patterns. Because we
+know the answer, we can check what an agent claims to find and how good its
+forecast is. The yardstick is the best possible forecast, the one that knows
+the hidden patterns: a score of 1.0 means the agent matched it.
 
-- **Sealed exam:** on six worlds built by a separate agent and run once with
-  frozen prompts, Opus scored 0.92 or more of the oracle on every world with
-  signal, and no model overfit the null world.
-- **A reference primer pushes out methods the model knows:** with the primer,
-  Haiku's plans drop PCA from 5/5 to 0/5. A separate plan call before the
-  primer restores them: on planted8, PCA in agent code went from 1 of 30 runs
-  to 17 of 18.
-- **Numbers reach Haiku where instructions do not:** one line in the data
-  summary (a per-group variance decomposition) raised Haiku's score on sector
-  worlds by 0.15 ± 0.24 of the oracle (8 fresh worlds), where a prompt line
-  asking for the same check did nothing.
-- **The agents cannot see the answers:** an audit of 472 run traces and a
-  deliberate break-in attempt found no read of the holdout or truth files.
+What we found:
+
+- On six test datasets built by a separate agent and never looked at before
+  the run, Opus came within 8% of the best possible forecast on every dataset
+  that had a pattern to find. On the one with no pattern, no model fooled
+  itself into finding one.
+- A cheat sheet of research methods made the model forget methods it already
+  knew. Asked to plan, Haiku included PCA in 5 of 5 plans without the sheet
+  and in 0 of 5 with it. Having the model write its own plan before it sees
+  the sheet brings these methods back into the code it runs (PCA in 17 of 18
+  runs, against 1 of 30).
+- Haiku ignores instructions but reacts to numbers. Telling it to check
+  whether a feature works within each sector changed nothing. Printing the
+  result of that check in the data summary it reads at the start improved its
+  forecasts on 6 of 8 new datasets.
+- The agents cannot peek at the answers. We checked the logs of all 472 runs
+  and told one agent to try to break in; every attempt was blocked.
 
 ## Setup
 
