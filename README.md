@@ -90,7 +90,7 @@ on new datasets with a sector rule the score rose by 0.15 for Haiku (95%
 interval 0.04 to 0.26) and 0.16 for Sonnet (0.06 to 0.27), at a small cost on
 datasets without one ([details](docs/results.md#5-why-haiku-fails-exam3)).
 
-The evals needed as much care as the agents. Our first improved prompt raised
+We also made mistakes in the evals. Our first improved prompt raised
 scores by 0.11 to 0.15, but we had written it while looking at the test
 dataset, and its two new checks were exactly the two hidden rules. On a
 dataset whose rules no prompt describes, Haiku, Sonnet and Opus missed the
