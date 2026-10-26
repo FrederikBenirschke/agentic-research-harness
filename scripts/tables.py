@@ -109,10 +109,7 @@ PLANTED3 = [  # (file stem, world, model, prompt or condition)
     ("claude-haiku-5-5-cur-nosummary", "planted3", "Haiku 5.5", "tuned, no data summary"),
     ("claude-haiku-5-5-eda", "planted3", "Haiku 5.5", "tuned + EDA instruction"),
     ("claude-haiku-5-5-eda-nosum", "planted3", "Haiku 5.5", "tuned + EDA instruction, no data summary"),
-    ("claude-haiku-5-5-move", "planted3", "Haiku 5.5", "tuned + squares instruction"),
     ("claude-haiku-5-5-3b-cur", "planted3b", "Haiku 5.5", "tuned"),
-    ("claude-haiku-5-5-3b-move", "planted3b", "Haiku 5.5", "tuned + squares instruction"),
-    ("claude-haiku-5-5-chain", "planted3", "Haiku 5.5", "forecaster given one finding from the squares arm"),
     ("claude-haiku-5-5-control", "planted3", "Haiku 5.5", "forecaster given a note naming all three mechanisms"),
 ]
 

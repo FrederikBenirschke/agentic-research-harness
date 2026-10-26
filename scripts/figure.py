@@ -12,7 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from tables import MODELS, PLANTED3, PROMPT, RESULTS, agent, load, ratios
+from tables import MODELS, PROMPT, RESULTS, agent, load, ratios
 
 OUT = Path(__file__).resolve().parents[1] / "docs" / "results.png"
 SURFACE, INK, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
@@ -55,35 +55,11 @@ def ablation(ax):
     style(ax)
 
 
-def discovery(ax):
-    """planted3 analysts that found the U-shape (no prompt names it), per arm."""
-    arms = [(f"{model.split()[0]}, {arm}" + ("" if w == "planted3" else " (planted3b)"),
-             load(RESULTS / "planted3" / f"{s}.jsonl"))
-            for s, w, model, arm in PLANTED3 if "forecaster" not in arm]
-    names, hits = [], []
-    for name, rows in arms:
-        a = agent(rows, "analyst")
-        names.append(name)
-        hits.append(sum(any("ushape" in h for h in r.get("mechanisms_hit") or []) for r in a))
-    colors = [CUR if "squares" in n else MUTED for n in names]
-    ax.barh(range(len(names)), hits, height=0.6, color=colors, zorder=3)
-    for i, h in enumerate(hits):
-        ax.text(h + 0.08, i, f"{h}/5", va="center", fontsize=9, color=INK)
-    ax.set_yticks(range(len(names)), names, color=INK)
-    ax.invert_yaxis()
-    ax.set_xlim(0, 5.6)
-    ax.set_xticks(range(6))
-    ax.set_xlabel("analyst runs (of 5) that found the U-shape in x04", color=MUTED, fontsize=9)
-    ax.set_title("planted3: a U-shape that no prompt describes", loc="left", color=INK, fontsize=11)
-    style(ax)
-
-
 if __name__ == "__main__":
-    fig, (a, b) = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw={"width_ratios": [1, 1.15]})
+    fig, a = plt.subplots(figsize=(7, 4.2))
     fig.patch.set_facecolor(SURFACE)
     ablation(a)
-    discovery(b)
-    fig.tight_layout(w_pad=3)
+    fig.tight_layout()
     OUT.parent.mkdir(exist_ok=True)
     fig.savefig(OUT, dpi=160, facecolor=SURFACE)
     print(f"wrote {OUT}")
