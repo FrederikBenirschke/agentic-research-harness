@@ -44,11 +44,18 @@ deviation over runs, or over datasets where stated.
   run, Opus came within 8% of the oracle on every dataset that had a pattern
   to find. On the one with no pattern, no model fooled itself into finding
   one.
-- A cheat sheet of research methods in the instructions made the model forget
-  methods it already knew. Asked to plan, Haiku included PCA in 5 of 5 plans
-  without the sheet and in 0 of 5 with it. Having the model write its own
-  plan before it sees the sheet brings these methods back into the code it
-  runs (PCA in 17 of 18 runs, against 1 of 30).
+- A list of research methods in the instructions made the model drop
+  methods it already knew. The agents' instructions end with a reference
+  list of things to check. To see what the list does, we sent the model one
+  message with the dataset's description and asked which checks it would
+  run, with no data and no tools. Without the reference list in that message,
+  Haiku's answer included PCA (finding the common factors that move many
+  assets together) 5 of 5 times; with the list included, 0 of 5 times. The
+  fix: before an agent starts, one separate call without the list asks the
+  model for its own checklist. The agent then gets that checklist on top of
+  its usual instructions and is told to run every check in it. On a dataset
+  built around common factors, the share of agent runs whose code actually
+  did PCA or grouped the assets went from 1 of 30 to 17 of 18.
 - Haiku ignores instructions but reacts to numbers. Telling it to check
   whether a column works within each sector changed nothing. Printing the
   result of that check in the data summary it reads at the start improved its
