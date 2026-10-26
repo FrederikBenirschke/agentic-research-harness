@@ -53,7 +53,7 @@ This decides how much each result says:
 
 | result | built on | tested on | what it shows |
 |---|---|---|---|
-| tuned prompt (Section 1) | planted1 | planted1b: same mechanisms, new seed | no seed overfit; not that it finds new kinds of mechanism |
+| tuned prompt (Section 1) | planted1 | planted1b: same mechanisms, new seed | nothing about discovery: the prompt names the mechanisms |
 | group decomposition (Section 5) | exam3, after the exam | fresh random worlds, same kind of sector effect | a generic diagnostic transfers within that mechanism family |
 | plan call (Section 3) | planted8 | planted8c, sealed exam | first result, n=3 |
 | sealed exam (Section 4) | nothing: frozen prompts, worlds built blind | | the clean test |
@@ -65,42 +65,24 @@ report them.
 
 ## Results
 
-![results](docs/results.png)
-
-### 1. Tuned prompts on a new seed
+### 1. A prompt that names the mechanism helps only on that mechanism
 
 The tuned prompt (`cur`) adds two checks to the original (`v1`): split an
-effect by regime (a date-level feature above or below its median), and fit `y`
-on both features of a correlated pair to see which keeps its effect.
+effect by a date-level regime, and fit `y` on both features of a correlated
+pair. These are planted1's two mechanisms (the `x07` gate on `x11`, and the
+decoy `x05`, a noisy copy of `x03`), so the prompt describes the answer. On
+planted1b (same mechanisms, new seed) it adds 0.11 to 0.15 of the oracle for
+Haiku, Sonnet and Opus. That is instruction following, not discovery.
 
-| model | prompt | planted1b score | forecaster found x07 gate | used decoy | planted2 (control) | $/run |
-|---|---|---|---|---|---|---|
-| gpt-oss (local) | original | 0.64 ± 0.14 | 0/3 | 0/3 | 0.90 ± 0.00 | - |
-| gpt-oss (local) | tuned | 0.63 ± 0.14 | 0/3 | 0/3 | 0.90 ± 0.00 | - |
-| Haiku 5.5 | original | 0.70 ± 0.08 | 1/5 | 4/5 | 0.90 ± 0.00 | 0.003 |
-| Haiku 5.5 | tuned | 0.81 ± 0.00 | 5/5 | 0/5 | 0.90 ± 0.02 | 0.005 |
-| Sonnet 5.5 | original | 0.74 ± 0.00 | 4/5 | 5/5 | 0.91 ± 0.00 | 0.043 |
-| Sonnet 5.5 | tuned | 0.85 ± 0.06 | 5/5 | 4/5 | 0.91 ± 0.00 | 0.048 |
-| Opus 5.5 | original | 0.80 ± 0.08 | 5/5 | 3/5 | 0.92 ± 0.01 | 0.153 |
-| Opus 5.5 | tuned | 0.95 ± 0.00 | 5/5 | 0/5 | 0.91 ± 0.00 | 0.149 |
-| Fable 5.1 | original | 0.95 ± 0.00 | 5/5 | 1/5 | 0.92 ± 0.03 | 0.594 |
-| Fable 5.1 | tuned | 0.92 ± 0.06 | 5/5 | 0/5 | 0.91 ± 0.01 | 0.532 |
-
-The tuned prompt adds 0.11 to 0.15 for Haiku, Sonnet and Opus and costs
-nothing on the control world planted2. Fable already finds the gate with the
-original prompt. gpt-oss finds it with neither; it fits a linear model on all
-16 features, and none of the numbers in its notes appear in its tool output
-(Claude models: 0.70 to 0.99). The gain does not come from a wider search:
-Claude forecasters score 1.0 to 1.3 models per run under both prompts.
-
-On planted3, whose mechanisms these checks do not target (a U-shape in `x04`
-with near-zero linear correlation, a two-period lag, a cross-asset lead), the
-tuned Haiku, Sonnet and Opus analysts missed the U-shape in 15 of 15 runs and
-their forecasters used the decoy `x12 = x04² + noise` in 15 of 15. A generic
-EDA instruction ("correlation ≈ 0 is not no effect: check deciles, lags > 1,
-other assets") raised lag-2 hits from 1/5 to 3/5 but found no U-shape. A
+On planted3, whose mechanisms it does not describe (a U-shape in `x04` with
+near-zero linear correlation, a two-period lag, a cross-asset lead), the tuned
+Haiku, Sonnet and Opus analysts missed the U-shape in 15 of 15 runs, and their
+forecasters used the decoy `x12 = x04² + noise` in 15 of 15. A generic EDA
+instruction ("correlation ≈ 0 is not no effect: check deciles, lags > 1,
+other assets") raised lag-2 hits from 1/5 to 3/5 and found no U-shape. A
 forecaster given a note naming all three mechanisms scores 1.00, so the gap is
-in discovery, not modelling.
+in discovery, not modelling. gpt-oss fits a linear model on all 16 features,
+and none of the numbers in its notes appear in its tool output.
 
 ### 2. The primer pushes out what the model knows
 
@@ -230,10 +212,6 @@ symlinks) was denied 76 times, and its trace has no truth-file content.
   name-only regex credited the sector effect in 10 of 13 Haiku runs that never
   used it (`mechanisms_in_model` fixes this by also requiring the features in
   the model code).
-- One real dataset (`rank100v2`, no truth file): the regime instruction left
-  holdout R² unchanged (0.042 vs 0.041).
-- An earlier planted1b batch (n=4, [docs/eval-log.md](docs/eval-log.md))
-  found no gain from the tuned prompt (0.73 vs 0.74); unresolved.
 
 ## Reproduce
 
