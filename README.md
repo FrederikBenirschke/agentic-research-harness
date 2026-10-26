@@ -61,33 +61,48 @@ files can be graded against the truth.
 - **Sealed exam.** Six datasets built by a separate agent, run once with
   frozen prompts ([protocol](docs/exam.md)).
 
-## What the evals caught
+## What we learned
 
-Full tables: [docs/results.md](docs/results.md).
+The plan was to make the agents better by telling them more. Later prompts
+ended with a reference list of quant research practice: how the score works,
+fat tails, removing each day's average, columns that stand in for others,
+effects that depend on the market's state, testing many ideas at once. This
+backfired. With the list in the prompt, Haiku stopped proposing methods it
+proposes on its own. Asked which checks it would run on a dataset, it named
+PCA in 5 of 5 answers without the list and in 0 of 5 with it. Its answers
+stayed the same length, so the list's items replaced its own ideas instead of
+adding to them. Opus kept its own ideas in the plan but did not act on them:
+on a dataset driven by common factors, none of 6 Opus runs did PCA.
 
-- **Prompts that leak the answer.** Instructions written while looking at a
-  dataset raised scores on that kind of dataset by 0.11 to 0.15, but on a
-  dataset whose rules no prompt describes, Haiku, Sonnet and Opus all missed
-  the main rule in 15 of 15 runs
-  ([section 1](docs/results.md#1-telling-the-agent-what-to-look-for)).
-- **Context that pushes out what the model knows.** A reference list of
-  methods in the prompt made Haiku drop PCA from 5 of 5 plans to 0 of 5. The
-  planning stage above was the fix: agents then ran those checks in 17 of 18
-  runs instead of 1 of 30. Whether forecasts improve is not settled yet
-  ([section 3](docs/results.md#3-letting-the-model-plan-before-it-reads-the-list)).
-- **Small models follow numbers, not instructions.** Telling Haiku to check
-  a column within each sector did nothing. Adding that check's result to the
-  data summary the harness computes raised the score on new datasets with a
-  sector rule, by +0.15 for Haiku (95% interval +0.04 to +0.26, better on 6
-  of 8) and +0.16 for Sonnet (+0.06 to +0.27, 8 of 8)
-  ([section 5](docs/results.md#5-why-haiku-fails-exam3)).
-- **Graders that lie.** A text-match grader credited Haiku with a rule in 10
-  of 13 runs that never used it; the grader now also requires the rule's
-  columns in the model code. An earlier bug counted a comment like
-  `# x05 dropped` as using the trap column.
-- **Sealed exam.** Opus came within 8% of the oracle on every exam dataset
-  with a pattern, and no model invented a pattern in the one without
-  ([section 4](docs/results.md#4-sealed-exam)).
+More instructions did not fix this. Telling the model to write its own list
+first, or introducing the reference as "in addition to what you know", barely
+moved it. What worked was changing the structure around the model. The
+runner now asks for the model's own checklist in a separate call that never
+sees the reference list, and puts that checklist at the top of the agent's
+prompt. Agents went from running PCA or grouping assets in 1 of 30 runs to 17
+of 18. Whether that gives better forecasts is not settled: on the one dataset
+where it should matter there are only 3 runs per setting
+([details](docs/results.md#2-the-reference-list-makes-the-model-forget-what-it-knows)).
+
+The same held for a single instruction. Haiku failed one exam dataset because
+it never compared a column with its sector's average on the same day, and a
+prompt line telling it to do that changed nothing. Computing the comparison
+and adding the numbers to the data summary every agent starts with did work:
+on new datasets with a sector rule the score rose by 0.15 for Haiku (95%
+interval 0.04 to 0.26) and 0.16 for Sonnet (0.06 to 0.27), at a small cost on
+datasets without one ([details](docs/results.md#5-why-haiku-fails-exam3)).
+
+The evals needed as much care as the agents. Our first improved prompt raised
+scores by 0.11 to 0.15, but we had written it while looking at the test
+dataset, and its two new checks were exactly the two hidden rules. On a
+dataset whose rules no prompt describes, Haiku, Sonnet and Opus missed the
+main rule in 15 of 15 runs ([details](docs/results.md#1-telling-the-agent-what-to-look-for)).
+We now record what each change was written against, and count only the sealed
+exam as a fair test: six datasets built by a separate agent and run once with
+frozen prompts, where Opus came within 8% of the best possible forecast on
+every dataset with a pattern ([details](docs/results.md#4-sealed-exam)). The
+graders needed the same scrutiny: a text-match check credited Haiku with a
+rule in 10 of 13 runs that never used it, because the notes said "group".
 
 ## Code
 
