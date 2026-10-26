@@ -143,7 +143,8 @@ group, and how well the feature predicts once the group's average is
 subtracted. The line names no feature and is computed the same way for any
 dataset (`ARH_SUMMARY=groups`).
 
-Haiku on `exam3`, 10 runs each:
+Haiku on `exam3`, 10 runs each (± is the spread over runs). The group line
+raised the score by +0.39 (95% interval +0.08 to +0.70):
 
 | data summary | score | runs at 0.7 or more |
 |---|---|---|
@@ -153,13 +154,17 @@ Haiku on `exam3`, 10 runs each:
 
 We wrote the line after seeing `exam3`, so we also tested it on new random
 datasets from `worlds/make_random.py`: 8 with a sector rule and 6 without, 3
-runs per setting. The table gives the average change in score, ± the spread
-across datasets:
+runs per setting. The table gives the average change in score with a 95%
+interval. The interval comes from a bootstrap that resamples runs and blocks
+of 10 held-back days, with both settings scored on the same days:
 
 | datasets | Haiku | Sonnet |
 |---|---|---|
-| 8 with a sector rule | +0.15 ± 0.24, better on 6 of 8 | +0.16 ± 0.11, better on 8 of 8 |
-| 6 without one | −0.06 ± 0.09, better on 2 of 6 | −0.05 (2 datasets run) |
+| 8 with a sector rule | +0.15 (+0.04 to +0.26), better on 6 of 8 | +0.16 (+0.06 to +0.27), better on 8 of 8 |
+| 6 without one | −0.06 (−0.17 to +0.03), better on 2 of 6 | −0.05 (−0.13 to +0.04), 2 datasets run |
+
+The gain varies a lot between datasets (standard deviation 0.24 for Haiku),
+but the average is clearly above zero.
 
 It helps where there is a sector rule and costs a little where there is none,
 because Haiku then sometimes builds on a group that predicts nothing. The test

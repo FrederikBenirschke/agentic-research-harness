@@ -77,8 +77,9 @@ Full tables: [docs/results.md](docs/results.md).
   ([section 3](docs/results.md#3-letting-the-model-plan-before-it-reads-the-list)).
 - **Small models follow numbers, not instructions.** Telling Haiku to check
   a column within each sector did nothing. Adding that check's result to the
-  data summary the harness computes raised its score on 6 of 8 new datasets
-  with a sector rule (+0.15 ± 0.24)
+  data summary the harness computes raised the score on new datasets with a
+  sector rule, by +0.15 for Haiku (95% interval +0.04 to +0.26, better on 6
+  of 8) and +0.16 for Sonnet (+0.06 to +0.27, 8 of 8)
   ([section 5](docs/results.md#5-why-haiku-fails-exam3)).
 - **Graders that lie.** A text-match grader credited Haiku with a rule in 10
   of 13 runs that never used it; the grader now also requires the rule's
