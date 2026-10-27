@@ -1,0 +1,14 @@
+{
+ "world": "../worlds/rand/r99",
+ "conditions": {
+  "analyst-open": {
+   "agent": "analyst",
+   "about": "how the features relate to y",
+   "notes": []
+  },
+  "forecaster-open": {
+   "agent": "forecaster",
+   "notes": []
+  }
+ }
+}

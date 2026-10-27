@@ -30,7 +30,7 @@ def _err(text: str) -> dict:
 
 
 def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, work: Path, world: Path,
-          can_score: bool, has_files: bool) -> tuple[object, list[str]]:
+          can_score: bool, has_files: bool, residuals: bool = False) -> tuple[object, list[str]]:
     train = work / "data" / "train.parquet"
 
     def resolve(path: str) -> Path:
@@ -123,14 +123,17 @@ def build(store: Store, *, run: str, agent: str, writes: list[str], cwd: Path, w
         try:
             path = resolve(args["path"])
             sha = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
-            folds, rank = await asyncio.to_thread(score.cv_full, path, pl.read_parquet(train))
+            oof = cwd / f"residuals_{sha[:8]}.parquet" if residuals else None
+            folds, rank = await asyncio.to_thread(score.cv_full, path, pl.read_parquet(train), oof=oof)
         except (ValueError, score.ScoreError) as e:
             store.add_trial(run, "", None, str(e)[:500], why)
             return _err(str(e))
         tid, n = store.add_trial(run, sha, sum(folds) / len(folds), None, why)
         return _ok(f"trial #{tid}: cv R2 mean {sum(folds) / len(folds):.4f}, folds {[round(f, 4) for f in folds]}; "
                    f"rank IC {rank['ic']:.4f}, top-minus-bottom quintile Sharpe per date {rank['ls_sharpe']:.3f}; "
-                   f"{n} distinct models scored in this research run so far")
+                   f"{n} distinct models scored in this research run so far"
+                   + (f". Its out-of-sample forecasts and residuals (date, asset, pred, resid) over the CV dates "
+                      f"are in {oof.name}" if oof else ""))
 
     @tool("request", "Record a library, tool or data you wanted for an idea but do not have (there is no network "
           "and no pip install). The maintainer reviews these. Then carry on with your fallback.",

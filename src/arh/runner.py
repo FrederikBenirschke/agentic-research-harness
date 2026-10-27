@@ -27,6 +27,7 @@ from arh import score, tools
 from arh.store import Store
 
 AGENTS = Path(__file__).with_name("agents")
+SKILLS = Path(__file__).with_name("skills")
 DEFAULT_MODEL = "claude-sonnet-5-5"
 REF = "## Reference: a map of quant research practice"   # where an arm's primer starts
 OLLAMA = os.environ.get("ARH_OLLAMA", "http://localhost:11434")
@@ -95,11 +96,14 @@ async def run_agent(root: Path, agent: str, task: str = "", model: str | None = 
     cwd = work / run
     (cwd / "tmp").mkdir(parents=True)
     server, names = tools.build(store, run=run, agent=agent, writes=meta["writes"], cwd=cwd, work=work,
-                                world=world, can_score="score" in meta.get("tools", []), has_files=shell)
+                                world=world, can_score="score" in meta.get("tools", []), has_files=shell,
+                                residuals="residuals" in meta.get("tools", []))
     store.start_run(run, agent, task, model)
     summary = store.search(kind="summary", k=1)
     if summary:                                   # append the data summary to every agent's prompt
         prompt += f"\n\n# Data summary (note #{summary[0]['id']})\n\n{summary[0]['text']}"
+    for name in meta.get("skills", []):           # method guides, generic to any dataset, inlined in full
+        prompt += "\n\n" + (SKILLS / name / "SKILL.md").read_text().split("---\n", 2)[2].strip()
     if wanted := store.requests():             # so later agents do not plan around what is missing
         prompt += "\n\n# Not available (requested by earlier agents)\n\n" + "\n".join(f"- {w['want']}" for w in wanted)
     if ask := ", ".join(meta.get("plan", [])):    # a plan from the model's own knowledge, before it sees the primer

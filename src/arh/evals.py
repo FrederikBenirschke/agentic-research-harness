@@ -101,7 +101,10 @@ def run_metrics(root: Path, run: str) -> dict:
     m = {"run": run, "agent": meta["agent"], "model": meta["model"],
          "finished": final is not None and not final.get("is_error") and not meta["error"],
          "error": meta["error"], "n_notes": len(notes),
-         "protocol_ok": len(notes) == 1 and all(n["kind"] in agent_meta["writes"] for n in notes),
+         # an agent that may write forecasts and other kinds (researcher) may write several notes but ends on a forecast
+         "protocol_ok": all(n["kind"] in agent_meta["writes"] for n in notes) and (
+             len(notes) == 1 if len(agent_meta["writes"]) == 1 or "forecast" not in agent_meta["writes"]
+             else bool(notes) and notes[0]["kind"] == "forecast"),
          "turns": meta["turns"], "wall_s": (final or {}).get("duration_ms", 0) / 1000 or None,
          "out_tokens": ((final or {}).get("usage") or {}).get("output_tokens"), "cost": meta["cost"],
          "tool_calls": len(calls), "tools": {k: sum(c["name"] == k for c in calls) for k in {c["name"] for c in calls}},
@@ -115,7 +118,8 @@ def run_metrics(root: Path, run: str) -> dict:
         m.update(exploration(code))
     if not notes:
         return m
-    note = notes[-1]
+    # notes are newest first; grade the latest forecast if there is one, else the latest note
+    note = next((n for n in notes if n["kind"] == "forecast"), notes[0])
     m["note_id"], m["kind"], m["text_len"] = note["id"], note["kind"], len(note["text"])
     seen_ids = {int(i) for i in re.findall(r"#(\d+)", seen)}
     m["refs_grounded"] = (sum(r in seen_ids for r in note["refs"]) / len(note["refs"])) if note["refs"] else None
@@ -315,7 +319,8 @@ async def run_conditions(spec_path: Path, conditions: list[str], model: str, n: 
         label += "-sum" + os.environ["ARH_SUMMARY"]
 
     async def rep(condition: str, i: int) -> dict:
-        cond = spec["conditions"][condition]
+        # "<agent>-open": the agent with no starting notes, for specs that do not list it
+        cond = spec["conditions"].get(condition) or {"agent": condition.removesuffix("-open"), "notes": []}
         async with gate:
             name = f"evals/{Path(spec['world']).name}-{condition}-{model.replace(':', '_')}-{label}-{mode}-{stamp}-r{i}"
             root = init(name, world)
@@ -390,6 +395,8 @@ HEADLINE = {
     "ideator": ["protocol_ok", "n_mechanisms_hit", "numbers_grounded", "judge_actionability", "judge_correct_rate"],
     "forecaster": ["protocol_ok", "holdout_vs_oracle", "x07_found", "decoy_in_model", "cv_reported_ok", "trials",
                    "judge_correct_rate"],
+    "researcher": ["protocol_ok", "holdout_vs_oracle", "x07_found", "decoy_in_model", "cv_reported_ok", "trials",
+                   "n_notes"],
 }
 SCORE = {"correct": 1.0, "partial": 0.5, "wrong": 0.0}
 
