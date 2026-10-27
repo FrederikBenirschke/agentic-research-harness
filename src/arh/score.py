@@ -3,13 +3,14 @@ agents) and the sealed holdout (recorded, never shown).
 
 The model runs in arh.worker under a macOS sandbox that denies reads of the
 private roots (default: the home dir, where every world's sealed data lives) except
-the model's own directory and the Python runtime. It is fed one date at a
+the model's own directory, the shared helper library next to it, and the Python runtime. It is fed one date at a
 time and sees a date's targets only after it has forecast that date.
 """
 
 from __future__ import annotations
 
 import io
+import json
 import os
 import struct
 import subprocess
@@ -25,7 +26,8 @@ WORKER = Path(__file__).with_name("worker.py")
 CV_FOLDS = 5
 CV_SHARE = 0.5          # the last half of the training dates is tested, in CV_FOLDS blocks
 ONE_THREAD = {v: "1" for v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
-                               "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS")}  # evals run many fits in parallel
+                               "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS", "POLARS_MAX_THREADS")}
+# evals run many fits in parallel; polars ignores the OpenMP variables and would take every core
 
 
 class ScoreError(Exception):
@@ -66,8 +68,32 @@ def forecast(model: Path, train: pl.DataFrame, test: pl.DataFrame, timeout_s: fl
     """Fit on ``train``, forecast ``test`` date by date; yhat in ``test``'s row order."""
     if sys.platform != "darwin":
         raise ScoreError("model sandbox needs macOS sandbox-exec")
+    return _session(model, timeout_s, lambda proc: _drive(proc, train, test))
+
+
+def pieces(model: Path, timeout_s: float = 60) -> list[list[str]] | None:
+    """The [name, claim] of each piece of a model written with ``Pieces``, or None if it is not."""
+    if sys.platform != "darwin":
+        raise ScoreError("model sandbox needs macOS sandbox-exec")
+
+    def ask(proc):
+        payload = _ipc(pl.DataFrame())
+        proc.stdin.write(b"N" + struct.pack("<Q", len(payload)) + payload)
+        proc.stdin.flush()
+        head = proc.stdout.read(9)
+        body = proc.stdout.read(struct.unpack("<Q", head[1:])[0])
+        if head[:1] == b"E":
+            raise ScoreError(body.decode(errors="replace"))
+        return json.loads(body)
+    return _session(model, timeout_s, ask)
+
+
+def _session(model: Path, timeout_s: float, talk):
+    """Start the sandboxed worker on ``model``, run ``talk(proc)``, and always stop it. The model may read its
+    own dir and the shared helper library (work/lib, next to its dir)."""
     model = model.resolve()
-    allow = [model.parent, WORKER, *runtime_paths()]
+    lib = model.parent.parent / "lib"
+    allow = [model.parent, WORKER, *runtime_paths(), *([lib] if lib.is_dir() else [])]
     with tempfile.TemporaryFile() as err:
         proc = subprocess.Popen(["sandbox-exec", "-p", profile(allow), sys.executable, "-I", str(WORKER), str(model)],
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, cwd=model.parent,
@@ -75,7 +101,7 @@ def forecast(model: Path, train: pl.DataFrame, test: pl.DataFrame, timeout_s: fl
         timer = threading.Timer(timeout_s, proc.kill)
         timer.start()
         try:
-            return _drive(proc, train, test)
+            return talk(proc)
         except (BrokenPipeError, struct.error) as e:
             err.seek(0)
             raise ScoreError(f"worker died ({'timeout' if not timer.is_alive() else e}): "
@@ -128,8 +154,10 @@ def rank_metrics(dates: np.ndarray, y: np.ndarray, yhat: np.ndarray) -> dict:
     return {"ic": float(per["ic"].mean()), "ls_sharpe": float(per["ls"].mean() / sd) if sd else 0.0}
 
 
-def cv_full(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> tuple[list[float], dict]:
-    """Expanding-window walk-forward R^2 per fold, and rank metrics over all CV test dates."""
+def cv_full(model: Path, train: pl.DataFrame, timeout_s: float = 600,
+            oof: Path | None = None) -> tuple[list[float], dict]:
+    """Expanding-window walk-forward R^2 per fold, and rank metrics over all CV test dates. ``oof``: also
+    write the out-of-fold forecasts and residuals (date, asset, pred, resid) there."""
     train = train.sort("date", "asset")
     dates = train["date"].unique().sort()
     start = int(len(dates) * (1 - CV_SHARE))
@@ -140,8 +168,11 @@ def cv_full(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> tuple[l
         test = train.filter(pl.col("date").is_in(block))
         yhat = forecast(model, fit, test, timeout_s / CV_FOLDS)
         scores.append(r2(test["y"].to_numpy(), yhat))
-        parts.append((test["date"].to_numpy(), test["y"].to_numpy(), yhat))
-    return scores, rank_metrics(*(np.concatenate(p) for p in zip(*parts)))
+        parts.append((test["date"].to_numpy(), test["y"].to_numpy(), yhat, test["asset"].to_numpy()))
+    d, y, yhat, asset = (np.concatenate(p) for p in zip(*parts))
+    if oof:
+        pl.DataFrame({"date": d, "asset": asset, "pred": yhat, "resid": y - yhat}).write_parquet(oof)
+    return scores, rank_metrics(d, y, yhat)
 
 
 def cv(model: Path, train: pl.DataFrame, timeout_s: float = 600) -> list[float]:

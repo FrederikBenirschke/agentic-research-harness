@@ -6,11 +6,13 @@ Protocol on stdin/stdout, frames of 1 type byte + 8-byte length + Arrow IPC:
   F <train>   fit; reply K
   P <today>   today's rows without y; reply Y <yhat>
   R <today>   today's rows with y, appended to history; no reply
+  N <any>     reply N <json>: the [name, claim] of each piece of the model's MODEL, or null if it has none
 Any exception replies E <traceback>.
 """
 
 import importlib.util
 import io
+import json
 import os
 import struct
 import sys
@@ -47,7 +49,10 @@ def main(model_path: str) -> None:
             if kind is None:
                 return
             df = pl.read_ipc(io.BytesIO(payload))
-            if kind == b"F":
+            if kind == b"N":
+                names = getattr(getattr(mod, "MODEL", None), "names", None)
+                write(out, b"N", json.dumps(names() if callable(names) else None).encode())
+            elif kind == b"F":
                 history, state = df, mod.fit(df)
                 write(out, b"K")
             elif kind == b"P":
