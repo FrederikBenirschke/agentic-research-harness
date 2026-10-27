@@ -1,0 +1,131 @@
+{
+ "proposed": [
+  {
+   "instance": "factor(kind=market, k=3)",
+   "necessity": 0.001,
+   "se": 0.0005,
+   "alone": 0.0
+  },
+  {
+   "instance": "vol(by=past, window=250)",
+   "necessity": -0.0015,
+   "se": 0.0002,
+   "alone": 0.0
+  },
+  {
+   "instance": "vol(by=past, window=5)",
+   "necessity": -0.0252,
+   "se": 0.0035,
+   "alone": -0.0001
+  },
+  {
+   "instance": "rank()",
+   "necessity": 0.0004,
+   "se": 0.0008,
+   "alone": 0.0
+  },
+  {
+   "instance": "linear(feature=x02)",
+   "necessity": 0.0011,
+   "se": 0.0005,
+   "alone": 0.0776
+  },
+  {
+   "instance": "linear(feature=x04)",
+   "necessity": -0.0,
+   "se": 0.0,
+   "alone": -0.0005
+  },
+  {
+   "instance": "linear(feature=x16)",
+   "necessity": -0.0003,
+   "se": 0.0001,
+   "alone": -0.0003
+  },
+  {
+   "instance": "saturating(scale=1.0, feature=x02)",
+   "necessity": 0.0108,
+   "se": 0.0018,
+   "alone": 0.0895
+  },
+  {
+   "instance": "hinge(cut=0.0, side=below, feature=x02)",
+   "necessity": 0.0,
+   "se": 0.0,
+   "alone": 0.0581
+  },
+  {
+   "instance": "lag(k=1, feature=x08)",
+   "necessity": 0.0388,
+   "se": 0.0037,
+   "alone": 0.0461
+  },
+  {
+   "instance": "lag(k=1, feature=x02)",
+   "necessity": -0.0001,
+   "se": 0.0001,
+   "alone": 0.0506
+  },
+  {
+   "instance": "market(k=0, series=x02)",
+   "necessity": -0.0,
+   "se": 0.0,
+   "alone": 0.0021
+  },
+  {
+   "instance": "market(k=1, series=frame)",
+   "necessity": 0.0,
+   "se": 0.0,
+   "alone": -0.0002
+  },
+  {
+   "instance": "market(k=2, series=frame)",
+   "necessity": 0.0,
+   "se": 0.0,
+   "alone": -0.0002
+  },
+  {
+   "instance": "own_lag(k=1)",
+   "necessity": -0.0001,
+   "se": 0.0,
+   "alone": 0.0058
+  },
+  {
+   "instance": "ou(series=frame, window=60)",
+   "necessity": -0.0,
+   "se": 0.0,
+   "alone": -0.0002
+  }
+ ],
+ "pruned": [
+  {
+   "instance": "factor(kind=market, k=3)",
+   "necessity": 0.0001,
+   "se": 0.0001,
+   "alone": 0.0
+  },
+  {
+   "instance": "linear(feature=x02)",
+   "necessity": 0.0016,
+   "se": 0.0009,
+   "alone": 0.0776
+  },
+  {
+   "instance": "saturating(scale=1.0, feature=x02)",
+   "necessity": 0.0133,
+   "se": 0.0027,
+   "alone": 0.0895
+  },
+  {
+   "instance": "lag(k=1, feature=x08)",
+   "necessity": 0.0447,
+   "se": 0.0038,
+   "alone": 0.0461
+  }
+ ],
+ "holdout": {
+  "proposed": 0.1174,
+  "pruned": 0.1465
+ },
+ "oracle": 0.1530738203124029
+}

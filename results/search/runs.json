@@ -1,0 +1,13 @@
+{
+ "r19-tree2": "full tree, seed 4",
+ "r19-tree3": "full tree, seed 5",
+ "r19-tree5": "full tree, seed 6",
+ "r19-greedys": "greedy + survey, seed 6",
+ "r112-nopb": "full tree, seed 7",
+ "r112-full-s8": "full tree, seed 8",
+ "r112-pb2": "full tree + playbook, seed 7",
+ "r112-greedy": "greedy, seed 7",
+ "r112-greedys": "greedy + survey, seed 7",
+ "r112-greedys-s8": "greedy + survey, seed 8",
+ "r112-noscreen": "greedy + survey, no screen, seed 7"
+}

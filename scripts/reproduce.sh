@@ -5,6 +5,6 @@ cd "$(dirname "$0")/.."
 PY=${PY:-.venv/bin/python}
 for g in worlds/make_planted.py worlds/make_planted2.py worlds/make_planted3.py worlds/make_planted4.py worlds/make_planted5.py \
          worlds/make_planted6.py worlds/make_planted7.py; do $PY "$g"; done
-$PY worlds/make_random.py 1 2 3     # dev seeds; exam seeds (>= 100000) are not built here
+$PY worlds/make_random.py 1 2 3 19 45 46 47 50 51 52 55 58 59 62 68 105 112 116   # dev seeds and the README figure worlds; exam seeds (>= 100000) are not built here
 $PY scripts/tables.py
 $PY scripts/figure.py
