@@ -1,4 +1,4 @@
-"""arh init | run | loop | status | notes | metrics | eval | report"""
+"""arh init | run | loop | search | status | notes | metrics | eval | report"""
 
 from __future__ import annotations
 
@@ -35,14 +35,15 @@ def init(name: str, world: Path) -> Path:
 
 
 async def loop(root: Path, mix: dict[str, int], rounds: int, parallel: int, model: str | None,
-               max_turns: int = 40, models: dict[str, str] | None = None) -> None:
+               max_turns: int = 40, models: dict[str, str] | None = None, prompts: Path | None = None) -> None:
     """Each round runs the roles in mix order, one stage per role, so a forecaster reads what this
     round's analysts and ideators wrote. Copies of one role run in parallel."""
     gate = asyncio.Semaphore(parallel)
 
     async def one(agent: str) -> None:
         async with gate:
-            run = await run_agent(root, agent, model=(models or {}).get(agent, model), max_turns=max_turns)
+            run = await run_agent(root, agent, model=(models or {}).get(agent, model), max_turns=max_turns,
+                                  prompts=prompts)
             print(f"done {run}", flush=True)
 
     for r in range(rounds):
@@ -89,9 +90,28 @@ def main() -> None:
     sub.choices["loop"].add_argument("--rounds", type=int, default=1)
     sub.choices["loop"].add_argument("--parallel", type=int, default=3)
     sub.choices["loop"].add_argument("--max-turns", type=int, default=40)
+    sub.choices["loop"].add_argument("--prompts", type=Path, help="dir of prompt versions to use instead of agents/")
     sub.choices["loop"].add_argument("--models", default="", help="per-role models, e.g. analyst:claude-sonnet-5-5")
     sub.choices["notes"].add_argument("--kind")
     sub.choices["notes"].add_argument("--query", default="")
+    s = sub.add_parser("search", help="parallel tree search over models on a shared node tree")
+    s.add_argument("name")
+    s.add_argument("--world", type=Path, help="init the run from this world if it does not exist")
+    s.add_argument("--steps", type=int, default=20, help="nodes in the tree when the search stops")
+    s.add_argument("--parallel", type=int, default=3)
+    s.add_argument("--model", default="claude-haiku-5-5")
+    s.add_argument("--step-turns", type=int, default=25)
+    s.add_argument("--drafts", type=int, default=5)
+    s.add_argument("--top-k", type=int, default=5)
+    s.add_argument("--eps", type=float, default=0.15)
+    s.add_argument("--seed", type=int, default=0)
+    s.add_argument("--no-ledger", action="store_true", help="control: steps see only their starting node")
+    s.add_argument("--report", action="store_true", help="print the full report and stop")
+    s.add_argument("--no-survey", action="store_true", help="do not force a survey step after the drafts")
+    s.add_argument("--no-playbook", action="store_true", help="do not file the standard ideas as idea nodes")
+    s.add_argument("--no-screen", action="store_true", help="control: no screen tool, its help or the survey")
+    s.add_argument("--pieces", action="store_true", help="write every model as named pieces; measure each one's necessity")
+    s.add_argument("--moves", help="comma-separated moves the bandit may pick (ablation); default all")
     s = sub.add_parser("metrics", help="process and grounding metrics for every agent run of a research run")
     s.add_argument("name")
     s.add_argument("--judge", help="Ollama model to grade each note")
@@ -116,6 +136,20 @@ def main() -> None:
     s.add_argument("--scorecard", action="store_true")
     a = p.parse_args()
 
+    if a.cmd == "search":
+        from arh import search
+        root = RUNS / a.name
+        if not root.exists():
+            if not a.world:
+                raise SystemExit(f"{root} does not exist; pass --world")
+            init(a.name, a.world)
+        if not a.report:
+            asyncio.run(search.search(root, a.steps, a.parallel, a.model, a.step_turns, a.drafts, a.top_k, a.eps,
+                                      a.seed, not a.no_ledger, not a.no_survey, not a.no_playbook,
+                                      set(a.moves.split(",")) if a.moves else None, not a.no_screen,
+                                      a.pieces))
+        search.report(root, full=True)
+        return
     if a.cmd in ("metrics", "eval", "report", "regrade"):
         from arh import evals
         if a.cmd == "metrics":
@@ -146,7 +180,7 @@ def main() -> None:
     elif a.cmd == "loop":
         mix = {k: int(v) for k, v in (x.split(":") for x in a.mix.split(","))}
         models = dict(x.split(":", 1) for x in a.models.split(",") if x)
-        asyncio.run(loop(root, mix, a.rounds, a.parallel, a.model, a.max_turns, models))
+        asyncio.run(loop(root, mix, a.rounds, a.parallel, a.model, a.max_turns, models, a.prompts))
     elif a.cmd == "status":
         status(root)
     elif a.cmd == "notes":
