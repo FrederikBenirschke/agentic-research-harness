@@ -7,6 +7,69 @@ build a forecasting model. The data is synthetic, with hidden rules that a
 generator writes down, so every claim an agent makes and every forecast it
 files can be graded against the truth.
 
+## How it evolved
+
+Each stage started from a problem the previous one exposed, and fixed it by
+changing the structure around the agents rather than adding instructions.
+Scores are holdout R² divided by the oracle's (the best possible forecast,
+computed from the hidden rules), so 1.0 is perfect; the agents and the evals
+are described below.
+
+1. **Role agents over a shared store.** Three agents (analyst, ideator,
+   forecaster), each one Markdown file, that share only a SQLite note store
+   exposed as an MCP server. Sandboxed shell, sandboxed scoring that feeds the
+   model one day at a time, traces for everything. An audit of 472 runs found
+   no read of a hidden file.
+2. **The evals caught our own cheating.** Our first improved prompt raised
+   scores by 0.11 to 0.15, but its two new checks were exactly the two hidden
+   rules of the dataset we wrote it on. On a dataset no prompt describes,
+   Haiku, Sonnet and Opus missed the main rule in 15 of 15 runs. Since then
+   every change records what it was written against, and only a sealed exam
+   (datasets built by a separate agent, run once with frozen prompts) counts as
+   a fair test. Opus came within 8% of the oracle on every exam dataset with a
+   pattern ([details](docs/results.md#1-telling-the-agent-what-to-look-for)).
+3. **Instructions displace knowledge.** A reference list of quant practice in
+   the prompt made Haiku stop proposing PCA (5 of 5 answers without it, 0 of 5
+   with it). Rewording did not help; moving the model's own checklist into a
+   separate call that never sees the list did: agents ran PCA or grouped
+   assets in 17 of 18 runs, against 1 of 30
+   ([details](docs/results.md#2-the-reference-list-makes-the-model-forget-what-it-knows)).
+4. **Tools beat instructions.** A prompt line telling Haiku to compare a
+   column with its sector average changed nothing; computing that comparison
+   into the data summary raised the score on new sector datasets by 0.15 for
+   Haiku and 0.16 for Sonnet ([details](docs/results.md#5-why-haiku-fails-exam3)).
+5. **Handoffs.** Because agents share only the store, a handoff can be fixed
+   and replayed. A Haiku forecaster scores 0.81 alone and 0.95 in 5 of 5 runs
+   when handed one finding by an Opus analyst: much of the gap between models
+   is in the research, not the modelling
+   ([details](docs/results.md#7-handing-notes-between-agents)).
+6. **Tree search.** `arh search` replaces fixed roles with a tree of notes
+   and model files grown by a bandit over typed moves (survey, residuals,
+   draft, act on a finding, simplify, merge, ...). It reaches 0.94 to 0.97 of
+   the oracle on one random world and 0.66 to 0.80 on a harder one, but does
+   not yet beat a greedy search, and its screening tool turned out to mirror
+   the generator's families, so it now runs with a `--no-screen` control arm
+   ([details](docs/results.md#8-tree-search-over-models)).
+7. **From a score to an explanation.** A good model file does not say why it
+   works. Models can now be a sum of named pieces, each with a claim and a
+   measured necessity (CV lost when it is dropped). One Haiku call turns a
+   tree's findings into such a theory; pruning pieces that do not earn their
+   place gives, on one world, four pieces that find both planted rules with no
+   false positive and score 0.147 against an oracle of 0.153, as well as the
+   best free-code model ([details](docs/results.md#9-from-a-score-to-an-explanation)).
+
+Three lessons carried through:
+
+- **Structure beats instructions.** Separate calls, computed summaries and
+  typed moves changed behaviour; prompt lines mostly did not.
+- **Check every change for leaking the answer.** A prompt line, a summary
+  statistic or a tool package written after seeing a dataset measures
+  instruction following on that dataset, not discovery.
+- **Grade the graders.** A text-match check credited Haiku with a sector rule
+  in 10 of 13 runs that never used it; the rule now has to appear in the
+  model code. The same kind of check still credits a lead-lag rule too
+  easily (section 9).
+
 ## The agents
 
 - **Three roles.** The *analyst* explores the data and writes findings. The
@@ -108,47 +171,6 @@ told to break in was refused 76 times. And a sealed exam, six datasets built
 by a separate agent and run once with frozen prompts
 ([protocol](docs/exam.md)), is the only test the prompts were not tuned on.
 
-## What we learned
-
-The plan was to make the agents better by telling them more. Later prompts
-ended with a reference list of quant research practice: how the score works,
-fat tails, removing each day's average, columns that stand in for others,
-effects that depend on the market's state, testing many ideas at once. This
-backfired. With the list in the prompt, Haiku stopped proposing methods it
-proposes on its own. Asked which checks it would run on a dataset, it named
-PCA in 5 of 5 answers without the list and in 0 of 5 with it. Its answers
-stayed the same length, so the list's items replaced its own ideas instead of
-adding to them. Opus kept its own ideas in the plan but did not act on them:
-on a dataset driven by common factors, none of 6 Opus runs did PCA.
-
-More instructions did not fix this. Telling the model to write its own list
-first, or introducing the reference as "in addition to what you know", barely
-moved it. What worked was changing the structure around the model. The
-runner now asks for the model's own checklist in a separate call that never
-sees the reference list, and puts that checklist at the top of the agent's
-prompt. Agents went from running PCA or grouping assets in 1 of 30 runs to 17
-of 18 ([details](docs/results.md#2-the-reference-list-makes-the-model-forget-what-it-knows)).
-
-The same held for a single instruction. Haiku failed one exam dataset because
-it never compared a column with its sector's average on the same day, and a
-prompt line telling it to do that changed nothing. Computing the comparison
-and adding the numbers to the data summary every agent starts with did work:
-on new datasets with a sector rule the score rose by 0.15 for Haiku (95%
-interval 0.04 to 0.26) and 0.16 for Sonnet (0.06 to 0.27), at a small cost on
-datasets without one ([details](docs/results.md#5-why-haiku-fails-exam3)).
-
-We also made mistakes in the evals. Our first improved prompt raised
-scores by 0.11 to 0.15, but we had written it while looking at the test
-dataset, and its two new checks were exactly the two hidden rules. On a
-dataset whose rules no prompt describes, Haiku, Sonnet and Opus missed the
-main rule in 15 of 15 runs ([details](docs/results.md#1-telling-the-agent-what-to-look-for)).
-We now record what each change was written against, and count only the sealed
-exam as a fair test: six datasets built by a separate agent and run once with
-frozen prompts, where Opus came within 8% of the best possible forecast on
-every dataset with a pattern ([details](docs/results.md#4-sealed-exam)). The
-graders needed the same scrutiny: a text-match check credited Haiku with a
-rule in 10 of 13 runs that never used it, because the notes said "group".
-
 ## Code
 
 | file | job |
@@ -158,8 +180,10 @@ rule in 10 of 13 runs that never used it, because the notes said "group".
 | `store.py` | notes (full-text search), runs, scored models, requests |
 | `score.py`, `worker.py` | walk-forward CV, hidden holdout, sandboxed model process |
 | `summary.py` | the data summary every agent starts with |
+| `search.py`, `screen.py` | tree search over notes and models; the feature screen |
+| `mechanisms.py`, `theory.py` | mechanism templates, `Pieces` models, necessity, grading against the truth |
 | `evals.py` | eval cells, graders, LLM judge, scorecards |
-| `cli.py` | `arh init / run / loop / eval / regrade / report` |
+| `cli.py` | `arh init / run / loop / search / eval / regrade / report` |
 | `worlds/` | dataset generators |
 
 ## Run it
@@ -177,3 +201,21 @@ Running agents calls the models (Haiku costs about $0.005 to $0.07 per run):
   --max-turns 15 --prompts evals/prompts/cur --out runs/evals/planted3/haiku.jsonl
 .venv/bin/arh report --scorecard runs/evals/planted3/haiku.jsonl
 ```
+
+A tree search, then a theory from its findings (about $0.35 to $0.55 for 60 Haiku steps):
+
+```bash
+.venv/bin/python worlds/make_random.py 19     # a random world; the draw depends only on the seed
+.venv/bin/arh search r19-tree --world worlds/rand/r19 --steps 60 --parallel 3
+.venv/bin/python scripts/theory_from_findings.py runs/r19-tree worlds/rand/r19 runs/r19-tree/theory
+```
+
+## Next steps
+
+- A prune move inside the tree, so the search itself keeps only pieces with
+  positive necessity, and sufficiency tables for `Pieces` models.
+- A full `--pieces` search against free code on several worlds and seeds.
+- A template for gating on a feature's own trailing correlation, the gap that
+  made the `r112` theory fail.
+- A benchmark of tree against greedy search on 6 worlds × 3 seeds, with
+  families the screen covers reported apart from those it does not.

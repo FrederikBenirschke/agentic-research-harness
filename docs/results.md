@@ -242,6 +242,87 @@ what the analyst finds.
 The full loop (`arh loop`) runs analysts, ideators and forecasters in rounds
 over one shared store. We have not benchmarked it end to end.
 
+## 8. Tree search over models
+
+`arh search` replaces the fixed roles with a search tree. Every node is a
+note (finding, idea) or a model file. Each step a bandit picks a move
+(survey, residuals, check, draft, act on a note, add a feature, change the
+form, simplify, merge, ...) and a starting node, one Haiku agent carries out
+the move, and a new model is scored by the same sandboxed walk-forward CV.
+The agent sees a ledger of the tree: every node's CV, what it was built on,
+and how often each note led to a better model. Moves can be switched off for
+ablations (`--moves`, `--top-k 1` for a greedy search that always extends the
+best node).
+
+Two random worlds, 60 steps each, best model by CV, holdout R² (oracle in
+brackets). One run per setting unless two seeds are shown:
+
+| world | setting | holdout R² | / oracle |
+|---|---|---|---|
+| `r19` (oracle 0.153) | full tree, 3 seeds | 0.144, 0.145, 0.148 | 0.94 to 0.97 |
+| | greedy + survey | 0.144 | 0.94 |
+| `r112` (oracle 0.122) | full tree + playbook ideas | 0.061 | 0.50 |
+| | full tree, seeds 7, 8 | 0.083, 0.097 | 0.68, 0.80 |
+| | greedy | 0.081 | 0.66 |
+| | greedy + survey, seeds 7, 8 | 0.094, 0.027 | 0.77, 0.22 |
+| | greedy + survey, no screen tool | 0.078 | 0.64 |
+
+The tree does not beat a greedy search here: the seed-to-seed spread on
+`r112` (0.027 to 0.094 for one setting) is larger than any gap between
+settings, and we did not compute how large a difference two runs could
+detect. Filing standard ideas as nodes up front ("playbook") was the one
+setting that looked worse, and it was dropped as the default.
+
+**The screen tool is spoon-feeding.** The survey move runs `screen.py`, which
+tests every feature with a package of transforms (factor, volatility,
+mean reversion, cross-section, lag, interaction, shape, conditioning). Those
+packages are the generator's families under other names, so a win from the
+survey partly measures whether the agent ran the tool, not whether it found
+anything. `--no-screen` is kept as the control arm; on `r112` it costs 0.016
+holdout R² in one pair of runs. Results on families the screen covers and on
+those it does not have to be reported apart.
+
+## 9. From a score to an explanation
+
+A tree reaches a good score but not a story: the best `r112` model (0.097)
+gets the regime rule and part of the sector rule, but it is 300 lines of
+code, and which of them matter cannot be read off. So models can now be
+written as a sum of named pieces (`mechanisms.Pieces`), each with a one-line
+claim. A piece is a template instance (lag, hinge, gate, group, lead, vol
+target, ...), any Python function of the data, or a change of target. After
+CV the harness drops each piece in turn, refits the rest, and reports its
+*necessity*: the fold-paired CV lost, with its standard error. Every template
+is tested by planting its effect with an independent numpy formula and
+recovering it (`tests/test_mechanisms.py`); `lead` covers one asset leading
+all, the mean of the others, and the largest stock of each sector.
+
+**From findings to a theory** (`scripts/theory_from_findings.py`). One Haiku
+call reads a finished tree's findings and the template list and writes a
+theory, claim by claim. Every piece is scored for necessity, the ones not
+above one SE are dropped, and the rest are refitted. On `r19` (findings of
+the 100-step tree):
+
+| | pieces | holdout R² | planted rules found | spurious pieces |
+|---|---|---|---|---|
+| proposed theory | 16 | 0.117 | 2 of 2 | 1 |
+| after pruning | 4 | 0.147 | 2 of 2 | 0 |
+| best tree model | (free code) | 0.144 | | |
+| oracle | | 0.153 | | |
+
+The pruned theory is four lines: a saturating effect of `x02` (with its
+linear part) and `x08` one period late, plus a market factor that does
+nothing. It scores as well as the best tree and says what drives `y`. The
+pruning used training CV only, but this is one world with two simple rules.
+
+On `r112` the same call failed: the theory needed a gate on a feature's own
+trailing correlation with `y` (the regime rule), no template expresses that,
+and Haiku invented a column for it. A 5-step smoke run of the tree with
+`--pieces` wrote all five models as pieces with a necessity table each,
+which shows the plumbing works, and two problems: collinear pieces each show
+necessity near 0, and a piece whose sign flips inside the CV window shows a
+large, noisy negative necessity. The text-match grader also credited the
+lead-lag rule to a piece that only uses a date mean.
+
 ## Can the agents see the answers?
 
 The agents run Python in the Claude Code sandbox. It blocks reading any file
@@ -255,6 +336,9 @@ refused 76 times, and its log contains nothing from the hidden files.
 
 ## Limitations
 
+- The tree search and the theory step (sections 8 and 9) ran on two random
+  worlds, mostly once per setting. They show the system works, not which
+  setting is better.
 - 3 to 10 runs per setting, and we did not compute how large a difference
   these could detect. A difference of one or two runs out of five means
   nothing.
